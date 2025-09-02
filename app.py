@@ -83,6 +83,9 @@ def add_missing_structures():
 @app.before_request
 def security_before_request():
     """Verificações de segurança antes de cada requisição"""
+    # Tornar a sessão permanente em todas as requisições
+    session.permanent = True
+
     if '_session_id' not in session and request.endpoint not in ['static', None]:
         session_security.init_session()
     elif '_session_id' in session:
