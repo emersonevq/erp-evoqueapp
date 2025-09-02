@@ -252,6 +252,29 @@ class SolicitacaoCompra(db.Model):
     def __repr__(self):
         return f'<SolicitacaoCompra {self.protocolo} - {self.produto}>'
 
+class AnexoArquivo(db.Model):
+    __tablename__ = 'anexos_arquivos'
+
+    id = db.Column(db.Integer, primary_key=True)
+    chamado_id = db.Column(db.Integer, db.ForeignKey('chamado.id'), nullable=True)
+    historico_ticket_id = db.Column(db.Integer, db.ForeignKey('historicos_tickets.id'), nullable=True)
+    nome_original = db.Column(db.String(255), nullable=False)
+    caminho_arquivo = db.Column(db.String(500), nullable=False)
+    mime_type = db.Column(db.String(100), nullable=True)
+    tamanho_bytes = db.Column(db.Integer, nullable=True)
+    data_upload = db.Column(db.DateTime, default=lambda: get_brazil_time().replace(tzinfo=None))
+    usuario_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+
+    chamado = db.relationship('Chamado', backref='anexos')
+
+    def url_publica(self):
+        if self.caminho_arquivo.startswith('static/'):
+            return '/' + self.caminho_arquivo
+        return self.caminho_arquivo
+
+    def __repr__(self):
+        return f'<AnexoArquivo {self.nome_original} ({self.tamanho_bytes} bytes)>'
+
 class HistoricoTicket(db.Model):
     __tablename__ = 'historicos_tickets'
     
