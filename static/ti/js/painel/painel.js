@@ -1180,6 +1180,7 @@ async function gerarSenha() {
 async function inicializarHistoricoChamados() {
     try {
         const select = document.getElementById('historicoChamadoSelect');
+        const filtroUnidade = document.getElementById('historicoFiltroUnidade');
         const btnAtualizar = document.getElementById('btnAtualizarHistorico');
         const container = document.getElementById('historicoCards');
         if (!select || !container) return;
@@ -1188,21 +1189,35 @@ async function inicializarHistoricoChamados() {
             await loadChamados();
         }
 
-        select.innerHTML = '';
-        const optDefault = document.createElement('option');
-        optDefault.value = '';
-        optDefault.textContent = 'Selecione um chamado';
-        select.appendChild(optDefault);
+        const preencherSelectChamados = () => {
+            select.innerHTML = '';
+            const optDefault = document.createElement('option');
+            optDefault.value = '';
+            optDefault.textContent = 'Selecione um chamado';
+            select.appendChild(optDefault);
+            const unidadeAlvo = filtroUnidade ? filtroUnidade.value : '';
+            (chamadosData||[])
+              .filter(c => !unidadeAlvo || c.unidade === unidadeAlvo)
+              .slice()
+              .sort((a,b)=> (a.codigo||'').localeCompare(b.codigo||''))
+              .forEach(c => {
+                  const opt = document.createElement('option');
+                  opt.value = c.id;
+                  opt.textContent = `${c.codigo} - ${c.solicitante} (${c.status})`;
+                  select.appendChild(opt);
+              });
+        };
 
-        chamadosData
-            .slice()
-            .sort((a,b)=> (a.codigo||'').localeCompare(b.codigo||''))
-            .forEach(c => {
-                const opt = document.createElement('option');
-                opt.value = c.id;
-                opt.textContent = `${c.codigo} - ${c.solicitante} (${c.status})`;
-                select.appendChild(opt);
-            });
+        // Popular filtro de unidades
+        if (filtroUnidade) {
+            while (filtroUnidade.children.length > 1) filtroUnidade.removeChild(filtroUnidade.lastChild);
+            const unidades = [...new Set((chamadosData||[]).map(c=>c.unidade).filter(Boolean))].sort();
+            unidades.forEach(u=>{ const o=document.createElement('option'); o.value=u; o.textContent=u; filtroUnidade.appendChild(o); });
+        }
+
+        preencherSelectChamados();
+
+        filtroUnidade && (filtroUnidade.onchange = () => { preencherSelectChamados(); container.innerHTML=''; });
 
         const carregar = async () => {
             const id = select.value;
@@ -1259,9 +1274,9 @@ function renderHistoricoCards(eventos) {
 
     eventos.forEach(ev => {
         const col = document.createElement('div');
-        col.className = 'col-12';
+        col.className = '';
         const card = document.createElement('div');
-        card.className = 'card history-card';
+        card.className = 'chamado-card';
         card.innerHTML = `
             <div class="card-header">
               <div><i class="fas ${iconByType[ev.tipo]||'fa-info-circle'} me-2"></i>${ev.titulo||'Evento'}</div>
@@ -2483,7 +2498,7 @@ function inicializarSistemaPainel() {
         // 4. Ativar seção inicial
         const hash = window.location.hash.substring(1);
         if (hash && document.getElementById(hash)) {
-            console.log('Ativando seção do hash:', hash);
+            console.log('Ativando seç��o do hash:', hash);
             activateSection(hash);
         } else {
             console.log('Ativando seç��o padrão: visao-geral');
@@ -3994,7 +4009,7 @@ function renderizarPaginacaoUsuarios(pagination) {
     }
 
     let paginationHTML = `
-        <nav aria-label="Paginação de usuários">
+        <nav aria-label="Paginaç��o de usuários">
             <ul class="pagination justify-content-center">
     `;
 
