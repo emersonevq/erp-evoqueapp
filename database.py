@@ -61,6 +61,9 @@ class User(db.Model, UserMixin):
     # Relacionamento com backups
     backups_criados = db.relationship('BackupHistorico', backref='usuario', lazy=True)
 
+    # Relacionamento com reset de senha
+    reset_senhas = db.relationship('ResetSenha', backref='usuario', lazy=True)
+
     @property
     def setores(self):
         if self._setores:
@@ -1032,6 +1035,63 @@ class ConfiguracaoSLA(db.Model):
 
     def __repr__(self):
         return f'<ConfiguracaoSLA {self.prioridade} - {self.tempo_resolucao}h>'
+
+class ResetSenha(db.Model):
+    """Tabela para controle de reset de senha"""
+    __tablename__ = 'reset_senha'
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    codigo = db.Column(db.String(6), nullable=False)  # Código de 6 dígitos
+    token = db.Column(db.String(255), nullable=False, unique=True)  # Token único para o link
+    usado = db.Column(db.Boolean, default=False)
+    data_criacao = db.Column(db.DateTime, default=lambda: get_brazil_time().replace(tzinfo=None))
+    data_expiracao = db.Column(db.DateTime, nullable=False)
+    data_uso = db.Column(db.DateTime, nullable=True)
+    ip_solicitacao = db.Column(db.String(45), nullable=True)
+    user_agent = db.Column(db.Text, nullable=True)
+    tentativas_uso = db.Column(db.Integer, default=0)
+    ip_uso = db.Column(db.String(45), nullable=True)
+
+    def esta_valido(self):
+        """Verifica se o código/token ainda é válido"""
+        if self.usado:
+            return False
+        return get_brazil_time().replace(tzinfo=None) < self.data_expiracao
+
+    def marcar_como_usado(self, ip_uso=None):
+        """Marca o reset como usado"""
+        self.usado = True
+        self.data_uso = get_brazil_time().replace(tzinfo=None)
+        if ip_uso:
+            self.ip_uso = ip_uso
+        db.session.commit()
+
+    def incrementar_tentativa(self):
+        """Incrementa contador de tentativas de uso"""
+        self.tentativas_uso += 1
+        db.session.commit()
+
+    def get_data_criacao_brazil(self):
+        """Retorna data de criação no timezone do Brasil"""
+        if self.data_criacao:
+            if self.data_criacao.tzinfo:
+                return self.data_criacao.astimezone(BRAZIL_TZ)
+            else:
+                return BRAZIL_TZ.localize(self.data_criacao)
+        return None
+
+    def get_data_expiracao_brazil(self):
+        """Retorna data de expiração no timezone do Brasil"""
+        if self.data_expiracao:
+            if self.data_expiracao.tzinfo:
+                return self.data_expiracao.astimezone(BRAZIL_TZ)
+            else:
+                return BRAZIL_TZ.localize(self.data_expiracao)
+        return None
+
+    def __repr__(self):
+        return f'<ResetSenha {self.id} - Usuario {self.usuario_id} - Codigo {self.codigo}>'
 
 def init_app(app):
     db.init_app(app)

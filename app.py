@@ -221,6 +221,24 @@ with app.app_context():
         else:
             print("⚠️  Algumas estruturas podem não ter sido criadas corretamente.")
         
+        # VERIFICAR CONFIGURAÇÕES DE EMAIL
+        try:
+            client_id = os.environ.get('CLIENT_ID')
+            tenant_id = os.environ.get('TENANT_ID')
+            user_id = os.environ.get('USER_ID')
+
+            if client_id and tenant_id and user_id:
+                print("✅ Configurações de email Microsoft Graph carregadas")
+                print(f"   📧 Email de envio: {user_id}")
+                print(f"   🏢 Tenant ID: {tenant_id[:8]}...")
+            else:
+                print("⚠️  Configurações de email incompletas")
+                if not client_id: print("   ❌ CLIENT_ID não configurado")
+                if not tenant_id: print("   ❌ TENANT_ID não configurado")
+                if not user_id: print("   ❌ USER_ID não configurado")
+        except Exception as e:
+            print(f"⚠️  Erro ao verificar configurações de email: {str(e)}")
+
         # INICIALIZAR SISTEMA DE SEGURANÇA
         print("🔒 Inicializando sistema de segurança...")
         print("✅ Middleware de segurança ativo")
@@ -331,6 +349,194 @@ def verificar_banco():
 
     except Exception as e:
         return f"❌ Erro: {str(e)}"
+
+@app.route('/testar-email')
+@login_required
+def testar_email():
+    """Endpoint para testar envio de email"""
+    if not current_user.nivel_acesso == 'Administrador':
+        return "Acesso negado", 403
+
+    try:
+        from setores.ti.email_service import email_service
+
+        # Email de teste
+        destinatario = current_user.email
+        assunto = "🧪 Teste de Email - Sistema Evoque"
+
+        corpo_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; margin: 0; padding: 20px; }}
+                .container {{ max-width: 600px; margin: 0 auto; background-color: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+                .header {{ background: linear-gradient(135deg, #FF6200 0%, #1C2526 100%); color: white; padding: 30px 20px; text-align: center; }}
+                .content {{ padding: 30px 20px; }}
+                .success-box {{ background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 5px; margin: 20px 0; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🧪 Teste de Email</h1>
+                    <p>Sistema Evoque Fitness</p>
+                </div>
+
+                <div class="content">
+                    <p>Olá <strong>{current_user.nome} {current_user.sobrenome}</strong>,</p>
+
+                    <div class="success-box">
+                        <h3>✅ Email funcionando perfeitamente!</h3>
+                        <p>O sistema de email Microsoft Graph está configurado e operacional.</p>
+                    </div>
+
+                    <p><strong>Detalhes da configuração:</strong></p>
+                    <ul>
+                        <li>✅ Microsoft Graph API integrado</li>
+                        <li>✅ Credenciais configuradas corretamente</li>
+                        <li>✅ Templates HTML funcionando</li>
+                        <li>✅ Sistema de reset de senha pronto</li>
+                    </ul>
+
+                    <p>Agora você pode usar com segurança a funcionalidade "Esqueci minha senha"!</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+        corpo_texto = f"""
+Teste de Email - Sistema Evoque Fitness
+
+Olá {current_user.nome} {current_user.sobrenome},
+
+✅ Email funcionando perfeitamente!
+
+O sistema de email Microsoft Graph está configurado e operacional.
+
+Detalhes da configuração:
+- ✅ Microsoft Graph API integrado
+- ✅ Credenciais configuradas corretamente
+- ✅ Templates HTML funcionando
+- ✅ Sistema de reset de senha pronto
+
+Agora você pode usar com segurança a funcionalidade "Esqueci minha senha"!
+        """
+
+        # Tentar enviar o email
+        print(f"🧪 Tentando enviar email de teste para: {destinatario}")
+        sucesso = email_service.enviar_email(destinatario, assunto, corpo_html, corpo_texto)
+
+        if sucesso:
+            return f"""
+            <h1>✅ Email enviado com sucesso!</h1>
+            <p><strong>Destinatário:</strong> {destinatario}</p>
+            <p><strong>Assunto:</strong> {assunto}</p>
+            <div style="background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <h3>🎉 Configuração funcionando perfeitamente!</h3>
+                <p>O sistema de email Microsoft Graph está operacional. Verifique sua caixa de entrada.</p>
+            </div>
+            <h3>✅ Funcionalidades habilitadas:</h3>
+            <ul>
+                <li>🔐 Sistema "Esqueci minha senha"</li>
+                <li>📧 Notificações de chamados</li>
+                <li>📨 Emails administrativos</li>
+                <li>🚨 Alertas do sistema</li>
+            </ul>
+            <p><a href="/">← Voltar ao Sistema</a></p>
+            """
+        else:
+            return f"""
+            <h1>❌ Erro ao enviar email</h1>
+            <p><strong>Destinatário:</strong> {destinatario}</p>
+            <p><strong>Status:</strong> Falha no envio</p>
+            <div style="background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <h3>🔍 Possíveis causas:</h3>
+                <ul>
+                    <li>Credenciais do Microsoft Graph incorretas</li>
+                    <li>Permissões insuficientes na aplicação Azure</li>
+                    <li>Email de origem não autorizado</li>
+                    <li>Problema de conectividade com a API</li>
+                </ul>
+            </div>
+            <p>Verifique os logs do servidor para mais detalhes.</p>
+            <p><a href="/">← Voltar ao Sistema</a></p>
+            """
+
+    except Exception as e:
+        return f"""
+        <h1>❌ Erro no teste de email</h1>
+        <p><strong>Erro:</strong> {str(e)}</p>
+        <p><a href="/">← Voltar ao Sistema</a></p>
+        """
+
+@app.route('/migrar-reset-senha')
+@login_required
+def migrar_reset_senha():
+    """Endpoint para criar a tabela de reset de senha"""
+    if not current_user.nivel_acesso == 'Administrador':
+        return "Acesso negado", 403
+
+    try:
+        from sqlalchemy import inspect
+
+        # Verificar se a tabela já existe
+        inspector = inspect(db.engine)
+        tabelas_existentes = inspector.get_table_names()
+
+        if 'reset_senha' in tabelas_existentes:
+            return """
+            <h1>✅ Tabela já existe</h1>
+            <p>A tabela 'reset_senha' já foi criada no banco de dados.</p>
+            <p><a href="/">← Voltar ao Sistema</a></p>
+            """
+
+        # Criar a tabela
+        db.create_all()
+
+        # Verificar se foi criada
+        inspector = inspect(db.engine)
+        tabelas_existentes = inspector.get_table_names()
+
+        if 'reset_senha' in tabelas_existentes:
+            colunas = inspector.get_columns('reset_senha')
+
+            resultado = []
+            resultado.append("<h1>🎉 Migração executada com sucesso!</h1>")
+            resultado.append("<h2>📋 Tabela 'reset_senha' criada</h2>")
+            resultado.append(f"<p><strong>Total de colunas:</strong> {len(colunas)}</p>")
+            resultado.append("<h3>📊 Estrutura da tabela:</h3>")
+            resultado.append("<ul>")
+            for col in colunas:
+                resultado.append(f"<li><strong>{col['name']}</strong>: {col['type']}</li>")
+            resultado.append("</ul>")
+            resultado.append("<h3>✨ Funcionalidades habilitadas:</h3>")
+            resultado.append("<ul>")
+            resultado.append("<li>🔐 Sistema 'Esqueci minha senha'</li>")
+            resultado.append("<li>📧 Envio de código por email</li>")
+            resultado.append("<li>🔗 Link direto para reset</li>")
+            resultado.append("<li>📝 Histórico de tentativas</li>")
+            resultado.append("<li>⏰ Expiração automática (30 min)</li>")
+            resultado.append("</ul>")
+            resultado.append("<p><strong>🚀 O sistema está pronto para uso!</strong></p>")
+            resultado.append("<p><a href='/'>← Voltar ao Sistema</a></p>")
+
+            return "".join(resultado)
+        else:
+            return """
+            <h1>❌ Erro na migração</h1>
+            <p>Não foi possível criar a tabela 'reset_senha'.</p>
+            <p><a href="/">← Voltar ao Sistema</a></p>
+            """
+
+    except Exception as e:
+        return f"""
+        <h1>❌ Erro na migração</h1>
+        <p>Erro: {str(e)}</p>
+        <p><a href="/">← Voltar ao Sistema</a></p>
+        """
 
 @app.route('/debug-sla')
 @login_required
