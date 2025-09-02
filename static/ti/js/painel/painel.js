@@ -1107,7 +1107,7 @@ modalSendTicketBtn.addEventListener('click', () => {
     ;
 });
 
-// Funcionalidades de Usuário
+// Funcionalidades de Usu��rio
 // Função para gerar nome de usuário automaticamente
 function gerarNomeUsuario() {
     const nome = document.getElementById('nomeUsuario').value.trim().toLowerCase();
@@ -1174,6 +1174,130 @@ async function gerarSenha() {
             window.advancedNotificationSystem.showError('Erro', 'Erro ao gerar senha. Tente novamente.');
         }
     }
+}
+
+// Histórico de chamados
+async function inicializarHistoricoChamados() {
+    try {
+        const select = document.getElementById('historicoChamadoSelect');
+        const btnAtualizar = document.getElementById('btnAtualizarHistorico');
+        const container = document.getElementById('historicoCards');
+        if (!select || !container) return;
+
+        if (!chamadosData || chamadosData.length === 0) {
+            await loadChamados();
+        }
+
+        select.innerHTML = '';
+        const optDefault = document.createElement('option');
+        optDefault.value = '';
+        optDefault.textContent = 'Selecione um chamado';
+        select.appendChild(optDefault);
+
+        chamadosData
+            .slice()
+            .sort((a,b)=> (a.codigo||'').localeCompare(b.codigo||''))
+            .forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = `${c.codigo} - ${c.solicitante} (${c.status})`;
+                select.appendChild(opt);
+            });
+
+        const carregar = async () => {
+            const id = select.value;
+            container.innerHTML = '';
+            if (!id) { container.innerHTML = '<p class="text-muted">Selecione um chamado para ver o histórico.</p>'; return; }
+            try {
+                const resp = await fetch(`/ti/painel/api/chamados/${id}/historico`);
+                if (!resp.ok) throw new Error('Falha ao carregar histórico');
+                const data = await resp.json();
+                renderHistoricoCards(data.eventos || []);
+            } catch (e) {
+                container.innerHTML = '<p class="text-danger">Erro ao carregar histórico.</p>';
+            }
+        };
+
+        select.onchange = carregar;
+        btnAtualizar && (btnAtualizar.onclick = carregar);
+
+        // Se houver um chamado em modal, pré-selecionar
+        if (window.currentModalChamadoId) {
+            select.value = window.currentModalChamadoId;
+            await carregar();
+        }
+
+    } catch (e) {
+        console.error('Erro ao inicializar histórico:', e);
+    }
+}
+
+function renderHistoricoCards(eventos) {
+    const container = document.getElementById('historicoCards');
+    container.innerHTML = '';
+    if (!eventos || eventos.length === 0) {
+        container.innerHTML = '<p class="text-muted">Nenhum evento no histórico.</p>';
+        return;
+    }
+
+    const iconByType = {
+        abertura: 'fa-plus-circle',
+        primeira_resposta: 'fa-reply',
+        status: 'fa-exchange-alt',
+        ticket: 'fa-envelope',
+        conclusao: 'fa-check-circle',
+        cancelamento: 'fa-times-circle'
+    };
+    const badgeByType = {
+        abertura: 'bg-secondary',
+        primeira_resposta: 'bg-info',
+        status: 'bg-warning',
+        ticket: 'bg-primary',
+        conclusao: 'bg-success',
+        cancelamento: 'bg-danger'
+    };
+
+    eventos.forEach(ev => {
+        const col = document.createElement('div');
+        col.className = 'col-12';
+        const card = document.createElement('div');
+        card.className = 'card history-card';
+        card.innerHTML = `
+            <div class="card-header">
+              <div><i class="fas ${iconByType[ev.tipo]||'fa-info-circle'} me-2"></i>${ev.titulo||'Evento'}</div>
+              <span class="badge ${badgeByType[ev.tipo]||'bg-secondary'}">${ev.tipo}</span>
+            </div>
+            <div class="card-body">
+              ${ev.mensagem ? `<p class="mb-2">${escapeHtml(ev.mensagem)}</p>` : ''}
+              ${ev.usuario ? `<p class="mb-1"><strong>Usuário:</strong> ${escapeHtml(ev.usuario)}</p>` : ''}
+              ${ev.data ? `<p class="text-muted mb-0"><i class="fas fa-clock me-1"></i>${formatarDataHora(ev.data)}</p>` : ''}
+              ${Array.isArray(ev.anexos) && ev.anexos.length ? `
+                <div class="mt-2">
+                  <div class="mb-1"><strong>Anexos:</strong></div>
+                  ${ev.anexos.map(a=>`<div class=\"history-attachment\"><i class=\"fas fa-paperclip\"></i><a href=\"${a.url}\" target=\"_blank\" rel=\"noopener\">${escapeHtml(a.nome)} ${a.tamanho_kb?`(${a.tamanho_kb} KB)`:''}</a></div>`).join('')}
+                </div>` : ''}
+            </div>`;
+        col.appendChild(card);
+        container.appendChild(col);
+    });
+}
+
+function formatarDataHora(dtStr) {
+    try {
+        const [d,h] = dtStr.split(' ');
+        const [y,m,dd]=d.split('-');
+        return `${dd}/${m}/${y} ${h}`;
+    } catch { return dtStr; }
+}
+
+function escapeHtml(s) {
+    if (!s) return '';
+    return s
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/\"/g,'&quot;')
+      .replace(/'/g,'&#039;');
 }
 
 // Event listener para o botão de gerar senha
@@ -2769,7 +2893,7 @@ function initializeSocketIO() {
             if (window.advancedNotificationSystem) {
                 window.advancedNotificationSystem.showWarning(
                     'Chamado Excluído',
-                    `Chamado ${data.codigo} foi exclu��do`
+                    `Chamado ${data.codigo} foi exclu���do`
                 );
             }
             // Recarregar dados se necessário
