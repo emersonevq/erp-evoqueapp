@@ -220,7 +220,7 @@ function activateSection(id) {
     }
 
     console.log(`Encontradas ${allSections.length} seções. Procurando se��ão: ${id}`);
-    console.log('Seções disponíveis:', Array.from(allSections).map(s => `${s.id} (classes: ${s.className})`));
+    console.log('Se��ões disponíveis:', Array.from(allSections).map(s => `${s.id} (classes: ${s.className})`));
 
     let sectionFound = false;
 
@@ -1241,10 +1241,35 @@ async function inicializarHistoricoChamados() {
                 container.innerHTML = '<p class="text-muted">Nenhum chamado para exibir.</p>';
                 return;
             }
-            for (const c of lista) {
-                const card = await criarCardHistoricoChamado(c);
-                container.appendChild(card);
+            const frag = document.createDocumentFragment();
+            for (const chamado of lista) {
+                const card = document.createElement('div');
+                card.className = 'chamado-card';
+                const statusClass = (chamado.status||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+                const statusIcon = { 'aberto':'fa-circle-notch','aguardando':'fa-clock','concluido':'fa-check-circle','cancelado':'fa-times-circle' }[statusClass]||'fa-circle';
+                const h = chamado.historico||{};
+                const linhas=[];
+                if (h.assumido_por_nome && h.assumido_em) linhas.push(`<li><i class=\"fas fa-reply history-icon\"></i><span>Assumido por ${escapeHtml(h.assumido_por_nome)} <small class=\"text-muted\">(${escapeHtml(h.assumido_em)})</small></span></li>`);
+                if (h.concluido_por_nome && h.concluido_em) linhas.push(`<li><i class=\"fas fa-check-circle history-icon\"></i><span>Concluído por ${escapeHtml(h.concluido_por_nome)} <small class=\"text-muted\">(${escapeHtml(h.concluido_em)})</small></span></li>`);
+                if (h.cancelado_por_nome && h.cancelado_em) linhas.push(`<li><i class=\"fas fa-times-circle history-icon\"></i><span>Cancelado por ${escapeHtml(h.cancelado_por_nome)} <small class=\"text-muted\">(${escapeHtml(h.cancelado_em)})</small></span></li>`);
+                card.innerHTML = `
+                    <div class=\"card-header\">
+                        <h3>${escapeHtml(chamado.codigo||'')}</h3>
+                        <div class=\"status-badge status-${statusClass}\"><i class=\"fas ${statusIcon}\"></i>${escapeHtml(chamado.status||'')}</div>
+                    </div>
+                    <div class=\"card-body\">
+                        <div class=\"info-row\"><strong>Solicitante:</strong><span>${escapeHtml(chamado.solicitante||'')}</span></div>
+                        <div class=\"info-row\"><strong>Problema:</strong><span>${escapeHtml(chamado.problema||'')}</span></div>
+                        <div class=\"info-row\"><strong>Unidade:</strong><span>${escapeHtml(chamado.unidade||'')}</span></div>
+                        <div class=\"info-row\"><strong>Data:</strong><span>${formatarData(chamado.data_abertura||'')}</span></div>
+                        <div class=\"history-section mt-2\">
+                            <p class=\"full-width\"><strong>Resumo</strong></p>
+                            <ul class=\"history-list\">${linhas.join('') || '<li><span class=\"text-muted\">Sem eventos</span></li>'}</ul>
+                        </div>
+                    </div>`;
+                frag.appendChild(card);
             }
+            container.appendChild(frag);
         };
 
         select.onchange = async () => { if (!select.value) { await carregarGeral(); } else { await carregar(); } };
