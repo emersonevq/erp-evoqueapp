@@ -642,7 +642,13 @@ async function updateChamadoStatus(chamadoId, novoStatus) {
         }
 
         const data = await response.json();
-        
+
+        // Atualiza o histórico local se fornecido
+        if (data && data.historico) {
+            const ch = chamadosData.find(c => c.id == chamadoId);
+            if (ch) ch.historico = data.historico;
+        }
+
         // Se o status foi atualizado com sucesso e é um dos status que requer notificação
         if (['Aguardando', 'Cancelado', 'Concluido'].includes(novoStatus)) {
             // Envia a notificação
@@ -2188,7 +2194,7 @@ function loadSectionContent(sectionId) {
             break;
         case 'grupos-usuarios':
             // Carregar grupos de usuários
-            console.log('Carregando seção de grupos de usuários...');
+            console.log('Carregando se��ão de grupos de usuários...');
             if (typeof inicializarGrupos === 'function') {
                 console.log('Função inicializarGrupos encontrada, executando...');
                 inicializarGrupos();
@@ -4167,7 +4173,7 @@ function renderizarGrupos(grupos) {
                 <p class="card-text group-description text-muted">${grupo.descricao || 'Sem descrição'}</p>
                 <div class="group-stats mb-3">
                     <small class="text-muted">
-                        <i class="fas fa-users"></i> ${grupo.membros_count} membros ���
+                        <i class="fas fa-users"></i> ${grupo.membros_count} membros •
                         <i class="fas fa-building"></i> ${grupo.unidades_count} unidades
                     </small>
                 </div>
@@ -4204,7 +4210,7 @@ async function carregarEstatisticasAgentes() {
         const estatisticas = await response.json();
         atualizarEstatisticasAgentes(estatisticas);
     } catch (error) {
-        console.error('Erro ao carregar estatísticas dos agentes:', error);
+        console.error('Erro ao carregar estat��sticas dos agentes:', error);
         // Tentar usar dados locais se disponíveis
         if (agentesData && agentesData.length > 0) {
             atualizarEstatisticasAgentesLocal(agentesData);
