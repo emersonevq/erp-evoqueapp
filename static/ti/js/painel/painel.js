@@ -998,6 +998,23 @@ function openModal(chamado) {
     modalData.textContent = chamado.data_abertura.split(' ')[0];
     modalStatusSelect.value = chamado.status;
 
+    // Anexos
+    const anexosSection = document.getElementById('modalAnexosSection');
+    const listaAnexos = document.getElementById('listaAnexos');
+    if (listaAnexos && anexosSection) {
+        listaAnexos.innerHTML = '';
+        if (Array.isArray(chamado.anexos) && chamado.anexos.length > 0) {
+            anexosSection.style.display = 'block';
+            chamado.anexos.forEach(ax => {
+                const li = document.createElement('li');
+                li.innerHTML = `<i class="fas fa-paperclip"></i><a href="${ax.url}" target="_blank" rel="noopener">${ax.nome} ${ax.tamanho_kb ? `(${ax.tamanho_kb} KB)` : ''}</a>`;
+                listaAnexos.appendChild(li);
+            });
+        } else {
+            anexosSection.style.display = 'none';
+        }
+    }
+
     modal.classList.add('active');
 }
 

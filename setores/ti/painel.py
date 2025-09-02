@@ -1756,7 +1756,7 @@ def auto_atribuir_chamado(chamado_id):
                 db.session.flush()  # Para obter o ID
                 logger.info(f"Agente criado automaticamente para usuário {current_user.id}")
             else:
-                return error_response('Usuário não tem permissão para ser agente', 403)
+                return error_response('Usu��rio não tem permissão para ser agente', 403)
 
         # Criar atribuição
         nova_atribuicao = ChamadoAgente(
@@ -2174,6 +2174,18 @@ def listar_chamados():
                         'nivel_experiencia': chamado_agente.agente.nivel_experiencia
                     }
 
+                anexos_payload = []
+                try:
+                    for a in getattr(c, 'anexos', []) or []:
+                        anexos_payload.append({
+                            'id': a.id,
+                            'nome': a.nome_original,
+                            'url': a.url_publica() if hasattr(a, 'url_publica') else ('/' + a.caminho_arquivo if a.caminho_arquivo else None),
+                            'tamanho_kb': round((a.tamanho_bytes or 0) / 1024)
+                        })
+                except Exception:
+                    anexos_payload = []
+
                 chamado_data = {
                     'id': c.id,
                     'codigo': c.codigo if hasattr(c, 'codigo') else None,
@@ -2192,7 +2204,8 @@ def listar_chamados():
                     'prioridade': c.prioridade if hasattr(c, 'prioridade') else 'Normal',
                     'visita_tecnica': c.visita_tecnica if hasattr(c, 'visita_tecnica') else False,
                     'agente': agente_info,
-                    'agente_id': agente_info['id'] if agente_info else None
+                    'agente_id': agente_info['id'] if agente_info else None,
+                    'anexos': anexos_payload
                 }
                 chamados_list.append(chamado_data)
                 logger.debug(f"Chamado {c.id} formatado com sucesso")
@@ -3124,18 +3137,31 @@ def enviar_ticket(id):
     try:
         chamado = Chamado.query.get_or_404(id)
         
-        if not request.is_json:
-            return error_response('Content-Type deve ser application/json', 400)
-            
-        data = request.get_json()
-        if not data:
-            return error_response('Dados não fornecidos', 400)
-        
-        assunto = data.get('assunto', f"Atualização do Chamado {chamado.codigo}")
-        mensagem = data.get('mensagem')
-        enviar_copia = data.get('enviar_copia', False)
-        prioridade = data.get('prioridade', False)
-        
+        data = None
+        assunto = None
+        mensagem = None
+        enviar_copia = False
+        prioridade = False
+
+        if request.content_type and request.content_type.startswith('multipart/form-data'):
+            form = request.form
+            assunto = form.get('assunto', f"Atualização do Chamado {chamado.codigo}")
+            mensagem = form.get('mensagem')
+            enviar_copia = form.get('enviar_copia', 'false').lower() in ['true', '1', 'on']
+            prioridade = form.get('prioridade', 'false').lower() in ['true', '1', 'on']
+            arquivos = request.files.getlist('anexos') or request.files.getlist('anexos[]')
+        else:
+            if not request.is_json:
+                return error_response('Content-Type deve ser application/json', 400)
+            data = request.get_json()
+            if not data:
+                return error_response('Dados não fornecidos', 400)
+            assunto = data.get('assunto', f"Atualização do Chamado {chamado.codigo}")
+            mensagem = data.get('mensagem')
+            enviar_copia = data.get('enviar_copia', False)
+            prioridade = data.get('prioridade', False)
+            arquivos = []
+
         if not mensagem:
             return error_response('A mensagem é obrigatória', 400)
 
@@ -3198,6 +3224,40 @@ Equipe de Suporte TI - Evoque Fitness
             )
             db.session.add(historico)
             db.session.commit()
+
+            # Salvar anexos do ticket, se houver
+            try:
+                if arquivos:
+                    from werkzeug.utils import secure_filename
+                    from security.security_config import SecurityConfig
+                    base_dir = os.path.join('static', 'uploads', 'tickets', chamado.codigo, str(historico.id))
+                    os.makedirs(base_dir, exist_ok=True)
+                    for arquivo in arquivos:
+                        if not arquivo or arquivo.filename == '':
+                            continue
+                        filename = secure_filename(arquivo.filename)
+                        ext = os.path.splitext(filename)[1].lower()
+                        if SecurityConfig.UPLOAD_EXTENSIONS and ext not in SecurityConfig.UPLOAD_EXTENSIONS:
+                            continue
+                        caminho = os.path.join(base_dir, filename)
+                        arquivo.save(caminho)
+                        tamanho = os.path.getsize(caminho) if os.path.exists(caminho) else None
+
+                        from database import AnexoArquivo
+                        anexo = AnexoArquivo(
+                            historico_ticket_id=historico.id,
+                            chamado_id=chamado.id,
+                            nome_original=arquivo.filename,
+                            caminho_arquivo=caminho.replace('\\', '/'),
+                            mime_type=arquivo.mimetype,
+                            tamanho_bytes=tamanho,
+                            usuario_id=current_user.id
+                        )
+                        db.session.add(anexo)
+                    db.session.commit()
+            except Exception as e:
+                logger.error(f"Erro ao salvar anexos do ticket: {str(e)}")
+                db.session.rollback()
             
             # Emitir evento Socket.IO apenas se a conexão estiver disponível
             try:
