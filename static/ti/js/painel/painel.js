@@ -2216,6 +2216,11 @@ function loadSectionContent(sectionId) {
                 }, 100);
             }
             break;
+        case 'historico':
+            if (typeof inicializarHistoricoChamados === 'function') {
+                inicializarHistoricoChamados();
+            }
+            break;
         case 'visao-geral':
             atualizarContadoresVisaoGeral();
             break;
