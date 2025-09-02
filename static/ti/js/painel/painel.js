@@ -1233,17 +1233,86 @@ async function inicializarHistoricoChamados() {
             }
         };
 
-        select.onchange = carregar;
-        btnAtualizar && (btnAtualizar.onclick = carregar);
+        const carregarGeral = async () => {
+            const unidadeAlvo = document.getElementById('historicoFiltroUnidade')?.value || '';
+            container.innerHTML = '';
+            const lista = (chamadosData||[]).filter(c => !unidadeAlvo || c.unidade === unidadeAlvo);
+            if (lista.length === 0) {
+                container.innerHTML = '<p class="text-muted">Nenhum chamado para exibir.</p>';
+                return;
+            }
+            for (const c of lista) {
+                const card = await criarCardHistoricoChamado(c);
+                container.appendChild(card);
+            }
+        };
+
+        select.onchange = async () => { if (!select.value) { await carregarGeral(); } else { await carregar(); } };
+        btnAtualizar && (btnAtualizar.onclick = async () => { if (!select.value) { await carregarGeral(); } else { await carregar(); } });
 
         // Se houver um chamado em modal, pré-selecionar
         if (window.currentModalChamadoId) {
             select.value = window.currentModalChamadoId;
             await carregar();
+        } else {
+            await carregarGeral();
         }
 
     } catch (e) {
         console.error('Erro ao inicializar histórico:', e);
+    }
+}
+
+async function criarCardHistoricoChamado(chamado) {
+    try {
+        const resp = await fetch(`/ti/painel/api/chamados/${chamado.id}/historico`);
+        const data = resp.ok ? await resp.json() : { eventos: [] };
+        const eventos = data.eventos || [];
+
+        const card = document.createElement('div');
+        card.className = 'chamado-card';
+
+        const statusClass = (chamado.status||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        const statusIcon = {
+            'aberto': 'fa-circle-notch',
+            'aguardando': 'fa-clock',
+            'concluido': 'fa-check-circle',
+            'cancelado': 'fa-times-circle'
+        }[statusClass] || 'fa-circle';
+
+        const linhasHistorico = eventos.slice(-3).map(ev => {
+            const iconByType = { abertura: 'fa-plus-circle', primeira_resposta: 'fa-reply', status: 'fa-exchange-alt', ticket: 'fa-envelope', conclusao: 'fa-check-circle', cancelamento: 'fa-times-circle' };
+            const titulo = ev.titulo || 'Evento';
+            const dataFmt = ev.data ? formatarDataHora(ev.data) : '';
+            const anexos = Array.isArray(ev.anexos) && ev.anexos.length ? `<div class=\"mt-1\">${ev.anexos.map(a=>`<div class=\"history-attachment\"><i class=\"fas fa-paperclip\"></i><a href=\"${a.url}\" target=\"_blank\" rel=\"noopener\">${escapeHtml(a.nome)}</a></div>`).join('')}</div>` : '';
+            return `<li><i class=\"fas ${iconByType[ev.tipo]||'fa-info-circle'} history-icon\"></i><span>${titulo}${ev.usuario?` - ${escapeHtml(ev.usuario)}`:''} ${dataFmt?`<small class=\"text-muted\">(${dataFmt})</small>`:''}</span>${anexos}</li>`;
+        }).join('');
+
+        card.innerHTML = `
+            <div class="card-header">
+                <h3>${chamado.codigo}</h3>
+                <div class="status-badge status-${statusClass}">
+                    <i class="fas ${statusIcon}"></i>
+                    ${chamado.status}
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="info-row"><strong>Solicitante:</strong><span>${escapeHtml(chamado.solicitante||'')}</span></div>
+                <div class="info-row"><strong>Problema:</strong><span>${escapeHtml(chamado.problema||'')}</span></div>
+                <div class="info-row"><strong>Unidade:</strong><span>${escapeHtml(chamado.unidade||'')}</span></div>
+                <div class="info-row"><strong>Data:</strong><span>${formatarData(chamado.data_abertura||'')}</span></div>
+                <div class="history-section mt-2">
+                    <p class="full-width"><strong>Últimas atividades</strong></p>
+                    <ul class="history-list">${linhasHistorico || '<li><span class=\"text-muted\">Sem eventos</span></li>'}</ul>
+                </div>
+            </div>
+        `;
+        return card;
+    } catch (e) {
+        const fallback = document.createElement('div');
+        fallback.className = 'chamado-card';
+        fallback.innerHTML = `<div class=\"card-body\"><p class=\"text-danger\">Erro ao carregar histórico</p></div>`;
+        return fallback;
     }
 }
 
