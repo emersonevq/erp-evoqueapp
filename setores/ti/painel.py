@@ -2215,7 +2215,6 @@ def listar_chamados():
                     }
                 }
                 chamados_list.append(chamado_data)
-                logger.debug(f"Chamado {c.id} formatado com sucesso")
             except Exception as e:
                 logger.error(f"Erro ao formatar chamado {c.id}: {str(e)}")
                 continue
@@ -2231,16 +2230,17 @@ def listar_chamados():
 @login_required
 @setor_required('ti')
 def obter_estatisticas_chamados():
-    """Retorna estatísticas dos chamados por status"""
+    """Retorna estatísticas dos chamados por status (cache 10s)"""
     try:
-        logger.info("Iniciando consulta de estatísticas de chamados...")
-
-        # Primeiro, verificar se existem chamados no banco
-        total_chamados = Chamado.query.count()
-        logger.info(f"Total de chamados no banco: {total_chamados}")
-
-        if total_chamados == 0:
-            logger.warning("Nenhum chamado encontrado no banco de dados")
+        # Cache simples em memória
+        global _stats_cache
+        try:
+            _stats_cache
+        except NameError:
+            _stats_cache = {'ts': None, 'data': None}
+        now = get_brazil_time()
+        if _stats_cache['ts'] and (now - _stats_cache['ts']).total_seconds() < 10:
+            return json_response(_stats_cache['data'])
 
         # Contar chamados por status
         estatisticas = db.session.query(
@@ -2248,26 +2248,19 @@ def obter_estatisticas_chamados():
             func.count(Chamado.id).label('quantidade')
         ).group_by(Chamado.status).all()
 
-        logger.info(f"Estatísticas brutas do banco: {estatisticas}")
-
-        # Converter para dicionário
         stats_dict = {}
         total = 0
-
         for status, quantidade in estatisticas:
             stats_dict[status] = quantidade
             total += quantidade
-            logger.info(f"Status {status}: {quantidade} chamados")
 
         # Adicionar status que podem não ter chamados
-        status_possiveis = ['Aberto', 'Aguardando', 'Concluido', 'Cancelado']
-        for status in status_possiveis:
+        for status in ['Aberto', 'Aguardando', 'Concluido', 'Cancelado']:
             if status not in stats_dict:
                 stats_dict[status] = 0
-
         stats_dict['total'] = total
 
-        logger.info(f"Estatísticas finais: {stats_dict}")
+        _stats_cache = {'ts': now, 'data': stats_dict}
         return json_response(stats_dict)
 
     except Exception as e:
@@ -3087,7 +3080,7 @@ def deletar_usuario(user_id):
         except Exception as socket_error:
             logger.warning(f"Erro ao emitir evento Socket.IO: {str(socket_error)}")
         
-        logger.info(f"Usu��rio {nome_usuario} foi deletado")
+        logger.info(f"Usuário {nome_usuario} foi deletado")
         return json_response({'message': 'Usuário deletado com sucesso'})
     except Exception as e:
         db.session.rollback()
@@ -3589,7 +3582,7 @@ def obter_chamados_detalhados_sla():
 def limpar_historico_violacoes_sla():
     """Limpa histórico de violações de SLA corrigindo datas de conclusão faltantes"""
     try:
-        logger.info(f"Iniciando limpeza de histórico SLA - usu��rio: {current_user.usuario}")
+        logger.info(f"Iniciando limpeza de histórico SLA - usuário: {current_user.usuario}")
 
         from datetime import datetime, timedelta
 
