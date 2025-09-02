@@ -1,11 +1,12 @@
 from flask import render_template, redirect, url_for, flash, request, jsonify, current_app
 from flask_login import login_user, logout_user, current_user, login_required
-from database import db, User, Chamado, Unidade, AgenteSuporte
+from database import db, User, Chamado, Unidade, AgenteSuporte, ResetSenha, get_brazil_time
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import secrets
 import string
-from datetime import datetime
+import random
+from datetime import datetime, timedelta
 from . import auth_bp
 
 def get_user_redirect_url(user):
@@ -238,3 +239,255 @@ def extend_session():
             'success': False,
             'message': 'Erro ao estender sessão'
         }), 500
+
+# ====================== FUNÇÕES DE RESET DE SENHA ======================
+
+def gerar_codigo_6_digitos():
+    """Gera um código de 6 dígitos aleatório"""
+    return ''.join([str(random.randint(0, 9)) for _ in range(6)])
+
+def gerar_token_seguro():
+    """Gera um token seguro para o link de reset"""
+    return secrets.token_urlsafe(32)
+
+def enviar_email_reset_senha(user, codigo, token):
+    """Envia email com código de reset de senha"""
+    try:
+        from setores.ti.email_service import email_service
+
+        return email_service.enviar_codigo_reset_senha(
+            usuario=user,
+            codigo=codigo,
+            token=token,
+            url_base=request.url_root
+        )
+
+    except Exception as e:
+        current_app.logger.error(f"Erro ao enviar email de reset: {str(e)}")
+        return False
+
+@auth_bp.route('/esqueci-senha', methods=['POST'])
+def esqueci_senha():
+    """Rota para solicitar reset de senha"""
+    try:
+        data = request.get_json()
+        usuario_email = data.get('usuario_email', '').strip()
+
+        if not usuario_email:
+            return jsonify({
+                'success': False,
+                'message': 'Por favor, digite seu usuário ou email.'
+            }), 400
+
+        # Buscar usuário por nome de usuário ou email
+        user = User.query.filter(
+            (User.usuario == usuario_email) | (User.email == usuario_email)
+        ).first()
+
+        if not user:
+            # Por segurança, não revelar se o usuário existe ou não
+            return jsonify({
+                'success': True,
+                'message': 'Se o usuário existir, um código foi enviado para o email cadastrado.'
+            })
+
+        if user.bloqueado:
+            return jsonify({
+                'success': False,
+                'message': 'Esta conta está bloqueada. Entre em contato com o administrador.'
+            }), 400
+
+        # Invalidar tentativas anteriores não utilizadas
+        ResetSenha.query.filter_by(usuario_id=user.id, usado=False).update({'usado': True})
+
+        # Gerar código e token
+        codigo = gerar_codigo_6_digitos()
+        token = gerar_token_seguro()
+
+        # Criar registro de reset
+        reset_senha = ResetSenha(
+            usuario_id=user.id,
+            codigo=codigo,
+            token=token,
+            data_expiracao=get_brazil_time().replace(tzinfo=None) + timedelta(minutes=30),
+            ip_solicitacao=request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr),
+            user_agent=request.headers.get('User-Agent', '')
+        )
+
+        db.session.add(reset_senha)
+        db.session.commit()
+
+        # Enviar email
+        if enviar_email_reset_senha(user, codigo, token):
+            current_app.logger.info(f"Reset de senha solicitado para usuário: {user.usuario}")
+
+            return jsonify({
+                'success': True,
+                'message': 'Código enviado para seu email!',
+                'token': token
+            })
+        else:
+            # Se falhou o envio do email, remover o registro
+            db.session.delete(reset_senha)
+            db.session.commit()
+
+            return jsonify({
+                'success': False,
+                'message': 'Erro ao enviar email. Verifique se o email está correto ou tente novamente em alguns minutos.'
+            }), 500
+
+    except Exception as e:
+        current_app.logger.error(f"Erro em esqueci_senha: {str(e)}")
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': 'Erro interno do servidor. Tente novamente.'
+        }), 500
+
+@auth_bp.route('/validar-codigo', methods=['POST'])
+def validar_codigo():
+    """Rota para validar código de 6 dígitos"""
+    try:
+        data = request.get_json()
+        codigo = data.get('codigo', '').strip()
+        token = data.get('token', '').strip()
+
+        if not codigo or not token:
+            return jsonify({
+                'success': False,
+                'message': 'Código e token são obrigatórios.'
+            }), 400
+
+        if len(codigo) != 6 or not codigo.isdigit():
+            return jsonify({
+                'success': False,
+                'message': 'O código deve ter exatamente 6 dígitos.'
+            }), 400
+
+        # Buscar registro de reset
+        reset_senha = ResetSenha.query.filter_by(
+            token=token,
+            codigo=codigo,
+            usado=False
+        ).first()
+
+        if not reset_senha:
+            return jsonify({
+                'success': False,
+                'message': 'Código inválido ou já utilizado.'
+            }), 400
+
+        if not reset_senha.esta_valido():
+            return jsonify({
+                'success': False,
+                'message': 'Código expirado. Solicite um novo código.'
+            }), 400
+
+        # Incrementar tentativas (para auditoria)
+        reset_senha.incrementar_tentativa()
+
+        current_app.logger.info(f"Código validado com sucesso para usuário: {reset_senha.usuario.usuario}")
+
+        return jsonify({
+            'success': True,
+            'message': 'Código validado com sucesso!'
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Erro em validar_codigo: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Erro interno do servidor.'
+        }), 500
+
+@auth_bp.route('/redefinir-senha', methods=['POST'])
+def redefinir_senha():
+    """Rota para redefinir a senha"""
+    try:
+        data = request.get_json()
+        nova_senha = data.get('nova_senha', '')
+        confirmar_senha = data.get('confirmar_senha', '')
+        token = data.get('token', '').strip()
+
+        if not nova_senha or not confirmar_senha or not token:
+            return jsonify({
+                'success': False,
+                'message': 'Todos os campos são obrigatórios.'
+            }), 400
+
+        if nova_senha != confirmar_senha:
+            return jsonify({
+                'success': False,
+                'message': 'As senhas não coincidem.'
+            }), 400
+
+        # Validar força da senha
+        senha_valida, mensagem = validar_senha(nova_senha)
+        if not senha_valida:
+            return jsonify({
+                'success': False,
+                'message': mensagem
+            }), 400
+
+        # Buscar registro de reset válido
+        reset_senha = ResetSenha.query.filter_by(
+            token=token,
+            usado=False
+        ).first()
+
+        if not reset_senha:
+            return jsonify({
+                'success': False,
+                'message': 'Token inválido ou já utilizado.'
+            }), 400
+
+        if not reset_senha.esta_valido():
+            return jsonify({
+                'success': False,
+                'message': 'Token expirado. Solicite um novo código.'
+            }), 400
+
+        # Atualizar senha do usuário
+        user = reset_senha.usuario
+        user.senha_hash = generate_password_hash(nova_senha)
+
+        # Marcar reset como usado
+        reset_senha.marcar_como_usado(
+            ip_uso=request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+        )
+
+        db.session.commit()
+
+        current_app.logger.info(f"Senha redefinida com sucesso para usuário: {user.usuario}")
+
+        return jsonify({
+            'success': True,
+            'message': 'Senha alterada com sucesso!'
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Erro em redefinir_senha: {str(e)}")
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': 'Erro interno do servidor.'
+        }), 500
+
+@auth_bp.route('/reset-senha')
+def reset_senha_link():
+    """Rota para acesso via link de email"""
+    token = request.args.get('token')
+
+    if not token:
+        flash('Link inválido ou expirado.', 'danger')
+        return redirect(url_for('auth.login'))
+
+    # Verificar se o token existe e é válido
+    reset_senha = ResetSenha.query.filter_by(token=token, usado=False).first()
+
+    if not reset_senha or not reset_senha.esta_valido():
+        flash('Link inválido ou expirado. Solicite um novo código.', 'danger')
+        return redirect(url_for('auth.login'))
+
+    # Renderizar página de login com modal de nova senha aberto
+    return render_template('login.html', reset_token=token, abrir_modal_senha=True)
