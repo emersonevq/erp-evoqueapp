@@ -2151,7 +2151,7 @@ function loadSectionContent(sectionId) {
                 console.log('Função carregarAgentes encontrada, executando...');
                 carregarAgentes();
             } else {
-                console.log('Função carregarAgentes não encontrada, tentando novamente em 100ms...');
+                console.log('Funç��o carregarAgentes não encontrada, tentando novamente em 100ms...');
                 setTimeout(() => {
                     if (typeof carregarAgentes === 'function') {
                         console.log('Função carregarAgentes encontrada no retry, executando...');
@@ -2590,17 +2590,19 @@ document.getElementById('btnEnviarTicket')?.addEventListener('click', async () =
     }
 
     try {
+        const fd = new FormData();
+        fd.append('assunto', assunto);
+        fd.append('mensagem', mensagem);
+        fd.append('prioridade', prioridade ? 'true' : 'false');
+        fd.append('enviar_copia', enviarCopia ? 'true' : 'false');
+        const fileInput = document.getElementById('ticketAnexos');
+        if (fileInput && fileInput.files) {
+            Array.from(fileInput.files).forEach(f => fd.append('anexos', f));
+        }
+
         const response = await fetch(`/ti/painel/api/chamados/${chamadoId}/ticket`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                assunto,
-                mensagem,
-                prioridade,
-                enviar_copia: enviarCopia
-            })
+            body: fd
         });
 
         if (!response.ok) {
