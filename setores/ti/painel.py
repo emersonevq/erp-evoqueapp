@@ -985,7 +985,7 @@ def atribuir_chamado_para_mim(chamado_id):
                 db.session.flush()  # Para obter o ID
                 logger.info(f"Agente criado automaticamente para usuário {current_user.id}")
             else:
-                logger.warning(f"Usuário {current_user.id} não tem permissão para ser agente")
+                logger.warning(f"Usuário {current_user.id} n��o tem permissão para ser agente")
                 return error_response('Usuário não tem permiss��o para ser agente', 403)
 
         # Verificar se o agente pode receber mais chamados
@@ -1413,7 +1413,7 @@ def marcar_notificacao_lida(notificacao_id):
 
 @painel_bp.route('/api/sla/configuracoes', methods=['GET'])
 @login_required
-@setor_required('TI')
+@setor_required('ti')
 def obter_configuracoes_sla():
     """Retorna configurações de SLA"""
     try:
@@ -1437,7 +1437,7 @@ def obter_configuracoes_sla():
 
 @painel_bp.route('/api/sla/configuracoes', methods=['POST'])
 @login_required
-@setor_required('TI')
+@setor_required('ti')
 def salvar_configuracoes_sla_api():
     """Salva configurações de SLA"""
     try:
@@ -1525,7 +1525,7 @@ def salvar_configuracoes_sla_api():
 
 @painel_bp.route('/api/sla/metricas', methods=['GET'])
 @login_required
-@setor_required('TI')
+@setor_required('ti')
 def obter_metricas_sla():
     """Retorna métricas consolidadas de SLA"""
     try:
@@ -2132,7 +2132,7 @@ def remover_unidade(id):
 
 @painel_bp.route('/api/chamados', methods=['GET'])
 @login_required
-@setor_required('TI')
+@setor_required('ti')
 def listar_chamados():
     try:
         logger.debug("Iniciando consulta de chamados...")
@@ -2205,7 +2205,15 @@ def listar_chamados():
                     'visita_tecnica': c.visita_tecnica if hasattr(c, 'visita_tecnica') else False,
                     'agente': agente_info,
                     'agente_id': agente_info['id'] if agente_info else None,
-                    'anexos': anexos_payload
+                    'anexos': anexos_payload,
+                    'historico': {
+                        'assumido_por_nome': f"{c.status_assumido_por.nome} {c.status_assumido_por.sobrenome}" if getattr(c, 'status_assumido_por', None) else None,
+                        'assumido_em': c.status_assumido_em.strftime('%d/%m/%Y %H:%M') if getattr(c, 'status_assumido_em', None) else None,
+                        'concluido_por_nome': f"{c.concluido_por.nome} {c.concluido_por.sobrenome}" if getattr(c, 'concluido_por', None) else None,
+                        'concluido_em': c.concluido_em.strftime('%d/%m/%Y %H:%M') if getattr(c, 'concluido_em', None) else None,
+                        'cancelado_por_nome': f"{c.cancelado_por.nome} {c.cancelado_por.sobrenome}" if getattr(c, 'cancelado_por', None) else None,
+                        'cancelado_em': c.cancelado_em.strftime('%d/%m/%Y %H:%M') if getattr(c, 'cancelado_em', None) else None
+                    }
                 }
                 chamados_list.append(chamado_data)
                 logger.debug(f"Chamado {c.id} formatado com sucesso")
@@ -2222,7 +2230,7 @@ def listar_chamados():
 
 @painel_bp.route('/api/chamados/estatisticas', methods=['GET'])
 @login_required
-@setor_required('TI')
+@setor_required('ti')
 def obter_estatisticas_chamados():
     """Retorna estatísticas dos chamados por status"""
     try:
@@ -2387,20 +2395,57 @@ def atualizar_status_chamado(id):
         
         status_anterior = chamado.status
         chamado.status = novo_status
-        
+
         # Atualizar campos de SLA baseado na mudança de status
         agora_brazil = get_brazil_time()
-        
-        # Se estava "Aberto" e mudou para outro status, registrar primeira resposta
-        if status_anterior == 'Aberto' and novo_status != 'Aberto' and not chamado.data_primeira_resposta:
-            chamado.data_primeira_resposta = agora_brazil.replace(tzinfo=None)
-        
+
+        # Se estava "Aberto" e mudou para outro status, registrar primeira resposta e quem assumiu
+        if status_anterior == 'Aberto' and novo_status != 'Aberto':
+            if not chamado.data_primeira_resposta:
+                chamado.data_primeira_resposta = agora_brazil.replace(tzinfo=None)
+            if not getattr(chamado, 'status_assumido_por_id', None):
+                try:
+                    chamado.status_assumido_por_id = current_user.id
+                    chamado.status_assumido_em = agora_brazil.replace(tzinfo=None)
+                except Exception:
+                    pass
+
+        # Se mudou para "Concluido" registrar quem concluiu
+        if novo_status == 'Concluido':
+            try:
+                chamado.concluido_por_id = current_user.id
+                chamado.concluido_em = agora_brazil.replace(tzinfo=None)
+            except Exception:
+                pass
+
+        # Se mudou para "Cancelado" registrar quem cancelou
+        if novo_status == 'Cancelado':
+            try:
+                chamado.cancelado_por_id = current_user.id
+                chamado.cancelado_em = agora_brazil.replace(tzinfo=None)
+            except Exception:
+                pass
+
         # Se mudou para "Concluido" ou "Cancelado", registrar conclusão
         if novo_status in ['Concluido', 'Cancelado'] and not chamado.data_conclusao:
             chamado.data_conclusao = agora_brazil.replace(tzinfo=None)
-        
+
         db.session.commit()
-        
+
+        # Montar histórico resumido
+        historico_payload = {}
+        try:
+            historico_payload = {
+                'assumido_por_nome': f"{chamado.status_assumido_por.nome} {chamado.status_assumido_por.sobrenome}" if getattr(chamado, 'status_assumido_por', None) else None,
+                'assumido_em': chamado.status_assumido_em.strftime('%d/%m/%Y %H:%M') if getattr(chamado, 'status_assumido_em', None) else None,
+                'concluido_por_nome': f"{chamado.concluido_por.nome} {chamado.concluido_por.sobrenome}" if getattr(chamado, 'concluido_por', None) else None,
+                'concluido_em': chamado.concluido_em.strftime('%d/%m/%Y %H:%M') if getattr(chamado, 'concluido_em', None) else None,
+                'cancelado_por_nome': f"{chamado.cancelado_por.nome} {chamado.cancelado_por.sobrenome}" if getattr(chamado, 'cancelado_por', None) else None,
+                'cancelado_em': chamado.cancelado_em.strftime('%d/%m/%Y %H:%M') if getattr(chamado, 'cancelado_em', None) else None
+            }
+        except Exception:
+            historico_payload = {}
+
         # Buscar informações do agente para incluir na resposta
         agente_info = None
         try:
@@ -2441,7 +2486,8 @@ def atualizar_status_chamado(id):
             'id': chamado.id,
             'status': chamado.status,
             'codigo': chamado.codigo,
-            'agente': agente_info
+            'agente': agente_info,
+            'historico': historico_payload
         })
     except Exception as e:
         db.session.rollback()
@@ -3320,7 +3366,7 @@ def notificacoes_recentes():
 
 @painel_bp.route('/api/sla/grafico-semanal', methods=['GET'])
 @login_required
-@setor_required('TI')
+@setor_required('ti')
 def obter_grafico_semanal():
     """Retorna dados para gráfico semanal de chamados"""
     try:
@@ -3376,7 +3422,7 @@ def obter_grafico_semanal():
 
 @painel_bp.route('/api/sla/chamados-detalhados', methods=['GET'])
 @login_required
-@setor_required('TI')
+@setor_required('ti')
 def obter_chamados_detalhados_sla():
     """Retorna lista detalhada de chamados com informações de SLA"""
     try:
@@ -3422,7 +3468,7 @@ def obter_chamados_detalhados_sla():
 
 @painel_bp.route('/api/sla/limpar-historico', methods=['POST'])
 @login_required
-@setor_required('TI')
+@setor_required('ti')
 def limpar_historico_violacoes_sla():
     """Limpa histórico de violações de SLA corrigindo datas de conclusão faltantes"""
     try:
@@ -3517,7 +3563,7 @@ def limpar_historico_violacoes_sla():
 
 @painel_bp.route('/api/sla/debug-violacoes', methods=['GET'])
 @login_required
-@setor_required('TI')
+@setor_required('ti')
 def debug_violacoes_sla():
     """Debug detalhado de violações SLA"""
     try:
@@ -3577,7 +3623,7 @@ def debug_violacoes_sla():
 
 @painel_bp.route('/api/sla/forcar-cumprimento', methods=['POST'])
 @login_required
-@setor_required('TI')
+@setor_required('ti')
 def forcar_cumprimento_sla():
     """Força o cumprimento de SLA ajustando datas para eliminar violações"""
     try:
@@ -3692,7 +3738,7 @@ def forcar_cumprimento_sla():
 
 @painel_bp.route('/api/sla/sincronizar-database', methods=['POST'])
 @login_required
-@setor_required('TI')
+@setor_required('ti')
 def sincronizar_sla_database():
     """Sincroniza banco de dados SLA com horário de São Paulo"""
     try:
@@ -3743,7 +3789,7 @@ def sincronizar_sla_database():
                 {'nome': 'Confraternização Universal', 'mes': 1, 'dia': 1},
                 {'nome': 'Tiradentes', 'mes': 4, 'dia': 21},
                 {'nome': 'Dia do Trabalhador', 'mes': 5, 'dia': 1},
-                {'nome': 'Independência do Brasil', 'mes': 9, 'dia': 7},
+                {'nome': 'Independ��ncia do Brasil', 'mes': 9, 'dia': 7},
                 {'nome': 'Nossa Senhora Aparecida', 'mes': 10, 'dia': 12},
                 {'nome': 'Finados', 'mes': 11, 'dia': 2},
                 {'nome': 'Proclamação da República', 'mes': 11, 'dia': 15},
@@ -3825,7 +3871,7 @@ def sincronizar_sla_database():
 
 @painel_bp.route('/api/debug/sla-violations', methods=['GET'])
 @login_required
-@setor_required('TI')
+@setor_required('ti')
 def debug_sla_violations_api():
     """Debug de violações de SLA persistentes"""
     try:

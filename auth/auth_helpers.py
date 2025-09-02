@@ -2,6 +2,7 @@ from functools import wraps
 from flask import redirect, url_for, flash, request, current_app, jsonify
 from flask_login import current_user, logout_user
 from datetime import datetime, timedelta
+from functools import wraps
 from database import db
 
 def is_api_request():

@@ -155,9 +155,22 @@ class Chamado(db.Model):
     data_conclusao = db.Column(db.DateTime, nullable=True)
     status = db.Column(db.String(20), default='Aberto')
     prioridade = db.Column(db.String(20), default='Normal')
-    
+
+    # Histórico de status
+    status_assumido_por_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    status_assumido_em = db.Column(db.DateTime, nullable=True)
+    concluido_por_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    concluido_em = db.Column(db.DateTime, nullable=True)
+    cancelado_por_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    cancelado_em = db.Column(db.DateTime, nullable=True)
+
     # Nova coluna para vincular ao usuário
     usuario_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+
+    # Relacionamentos para histórico
+    status_assumido_por = db.relationship('User', foreign_keys=[status_assumido_por_id])
+    concluido_por = db.relationship('User', foreign_keys=[concluido_por_id])
+    cancelado_por = db.relationship('User', foreign_keys=[cancelado_por_id])
 
     def get_data_abertura_brazil(self):
         """Retorna data de abertura no timezone do Brasil"""

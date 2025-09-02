@@ -1007,11 +1007,35 @@ function openModal(chamado) {
             anexosSection.style.display = 'block';
             chamado.anexos.forEach(ax => {
                 const li = document.createElement('li');
-                li.innerHTML = `<i class="fas fa-paperclip"></i><a href="${ax.url}" target="_blank" rel="noopener">${ax.nome} ${ax.tamanho_kb ? `(${ax.tamanho_kb} KB)` : ''}</a>`;
+                li.innerHTML = `<i class=\"fas fa-paperclip\"></i><a href=\"${ax.url}\" target=\"_blank\" rel=\"noopener\">${ax.nome} ${ax.tamanho_kb ? `(${ax.tamanho_kb} KB)` : ''}</a>`;
                 listaAnexos.appendChild(li);
             });
         } else {
             anexosSection.style.display = 'none';
+        }
+    }
+
+    // Histórico
+    const historicoSection = document.getElementById('modalHistoricoSection');
+    const listaHistorico = document.getElementById('listaHistorico');
+    if (listaHistorico && historicoSection) {
+        listaHistorico.innerHTML = '';
+        const h = chamado.historico || {};
+        const itens = [];
+        if (h.assumido_por_nome && h.assumido_em) {
+            itens.push(`<li><i class=\"fas fa-user-check history-icon\"></i><span>Assumido por ${h.assumido_por_nome} em ${h.assumido_em}</span></li>`);
+        }
+        if (h.concluido_por_nome && h.concluido_em) {
+            itens.push(`<li><i class=\"fas fa-check-circle history-icon\"></i><span>Concluído por ${h.concluido_por_nome} em ${h.concluido_em}</span></li>`);
+        }
+        if (h.cancelado_por_nome && h.cancelado_em) {
+            itens.push(`<li><i class=\"fas fa-times-circle history-icon\"></i><span>Cancelado por ${h.cancelado_por_nome} em ${h.cancelado_em}</span></li>`);
+        }
+        if (itens.length > 0) {
+            historicoSection.style.display = 'block';
+            listaHistorico.innerHTML = itens.join('');
+        } else {
+            historicoSection.style.display = 'none';
         }
     }
 
@@ -4143,7 +4167,7 @@ function renderizarGrupos(grupos) {
                 <p class="card-text group-description text-muted">${grupo.descricao || 'Sem descrição'}</p>
                 <div class="group-stats mb-3">
                     <small class="text-muted">
-                        <i class="fas fa-users"></i> ${grupo.membros_count} membros •
+                        <i class="fas fa-users"></i> ${grupo.membros_count} membros ���
                         <i class="fas fa-building"></i> ${grupo.unidades_count} unidades
                     </small>
                 </div>
