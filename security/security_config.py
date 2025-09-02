@@ -15,7 +15,7 @@ class SecurityConfig:
     SESSION_COOKIE_SECURE = False  # True em produção com HTTPS
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
-    PERMANENT_SESSION_LIFETIME = timedelta(minutes=30)  # Aumentado para 30 min
+    PERMANENT_SESSION_LIFETIME = timedelta(days=3650)  # 10 anos para sessões permanentes
     
     # Configurações CSRF
     WTF_CSRF_ENABLED = True
