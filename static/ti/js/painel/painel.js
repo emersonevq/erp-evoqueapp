@@ -642,7 +642,13 @@ async function updateChamadoStatus(chamadoId, novoStatus) {
         }
 
         const data = await response.json();
-        
+
+        // Atualiza o histórico local se fornecido
+        if (data && data.historico) {
+            const ch = chamadosData.find(c => c.id == chamadoId);
+            if (ch) ch.historico = data.historico;
+        }
+
         // Se o status foi atualizado com sucesso e é um dos status que requer notificação
         if (['Aguardando', 'Cancelado', 'Concluido'].includes(novoStatus)) {
             // Envia a notificação
@@ -997,6 +1003,47 @@ function openModal(chamado) {
     modalVisita.textContent = chamado.visita_tecnica ? 'Sim' : 'Não';
     modalData.textContent = chamado.data_abertura.split(' ')[0];
     modalStatusSelect.value = chamado.status;
+
+    // Anexos
+    const anexosSection = document.getElementById('modalAnexosSection');
+    const listaAnexos = document.getElementById('listaAnexos');
+    if (listaAnexos && anexosSection) {
+        listaAnexos.innerHTML = '';
+        if (Array.isArray(chamado.anexos) && chamado.anexos.length > 0) {
+            anexosSection.style.display = 'block';
+            chamado.anexos.forEach(ax => {
+                const li = document.createElement('li');
+                li.innerHTML = `<i class=\"fas fa-paperclip\"></i><a href=\"${ax.url}\" target=\"_blank\" rel=\"noopener\">${ax.nome} ${ax.tamanho_kb ? `(${ax.tamanho_kb} KB)` : ''}</a>`;
+                listaAnexos.appendChild(li);
+            });
+        } else {
+            anexosSection.style.display = 'none';
+        }
+    }
+
+    // Histórico
+    const historicoSection = document.getElementById('modalHistoricoSection');
+    const listaHistorico = document.getElementById('listaHistorico');
+    if (listaHistorico && historicoSection) {
+        listaHistorico.innerHTML = '';
+        const h = chamado.historico || {};
+        const itens = [];
+        if (h.assumido_por_nome && h.assumido_em) {
+            itens.push(`<li><i class=\"fas fa-user-check history-icon\"></i><span>Assumido por ${h.assumido_por_nome} em ${h.assumido_em}</span></li>`);
+        }
+        if (h.concluido_por_nome && h.concluido_em) {
+            itens.push(`<li><i class=\"fas fa-check-circle history-icon\"></i><span>Concluído por ${h.concluido_por_nome} em ${h.concluido_em}</span></li>`);
+        }
+        if (h.cancelado_por_nome && h.cancelado_em) {
+            itens.push(`<li><i class=\"fas fa-times-circle history-icon\"></i><span>Cancelado por ${h.cancelado_por_nome} em ${h.cancelado_em}</span></li>`);
+        }
+        if (itens.length > 0) {
+            historicoSection.style.display = 'block';
+            listaHistorico.innerHTML = itens.join('');
+        } else {
+            historicoSection.style.display = 'none';
+        }
+    }
 
     modal.classList.add('active');
 }
@@ -2134,7 +2181,7 @@ function loadSectionContent(sectionId) {
                 console.log('Função carregarAgentes encontrada, executando...');
                 carregarAgentes();
             } else {
-                console.log('Função carregarAgentes não encontrada, tentando novamente em 100ms...');
+                console.log('Funç��o carregarAgentes não encontrada, tentando novamente em 100ms...');
                 setTimeout(() => {
                     if (typeof carregarAgentes === 'function') {
                         console.log('Função carregarAgentes encontrada no retry, executando...');
@@ -2147,7 +2194,7 @@ function loadSectionContent(sectionId) {
             break;
         case 'grupos-usuarios':
             // Carregar grupos de usuários
-            console.log('Carregando seção de grupos de usuários...');
+            console.log('Carregando se��ão de grupos de usuários...');
             if (typeof inicializarGrupos === 'function') {
                 console.log('Função inicializarGrupos encontrada, executando...');
                 inicializarGrupos();
@@ -2573,17 +2620,19 @@ document.getElementById('btnEnviarTicket')?.addEventListener('click', async () =
     }
 
     try {
+        const fd = new FormData();
+        fd.append('assunto', assunto);
+        fd.append('mensagem', mensagem);
+        fd.append('prioridade', prioridade ? 'true' : 'false');
+        fd.append('enviar_copia', enviarCopia ? 'true' : 'false');
+        const fileInput = document.getElementById('ticketAnexos');
+        if (fileInput && fileInput.files) {
+            Array.from(fileInput.files).forEach(f => fd.append('anexos', f));
+        }
+
         const response = await fetch(`/ti/painel/api/chamados/${chamadoId}/ticket`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                assunto,
-                mensagem,
-                prioridade,
-                enviar_copia: enviarCopia
-            })
+            body: fd
         });
 
         if (!response.ok) {
@@ -4161,7 +4210,7 @@ async function carregarEstatisticasAgentes() {
         const estatisticas = await response.json();
         atualizarEstatisticasAgentes(estatisticas);
     } catch (error) {
-        console.error('Erro ao carregar estatísticas dos agentes:', error);
+        console.error('Erro ao carregar estat��sticas dos agentes:', error);
         // Tentar usar dados locais se disponíveis
         if (agentesData && agentesData.length > 0) {
             atualizarEstatisticasAgentesLocal(agentesData);

@@ -386,6 +386,40 @@ def abrir_chamado():
                 db.session.add(novo_chamado)
                 db.session.commit()
 
+                # Processar anexos enviados
+                try:
+                    from werkzeug.utils import secure_filename
+                    from security.security_config import SecurityConfig
+                    arquivos = request.files.getlist('anexos') or request.files.getlist('anexos[]')
+                    if arquivos:
+                        base_dir = os.path.join('static', 'uploads', 'chamados', codigo_gerado)
+                        os.makedirs(base_dir, exist_ok=True)
+                        for arquivo in arquivos:
+                            if not arquivo or arquivo.filename == '':
+                                continue
+                            filename = secure_filename(arquivo.filename)
+                            ext = os.path.splitext(filename)[1].lower()
+                            if SecurityConfig.UPLOAD_EXTENSIONS and ext not in SecurityConfig.UPLOAD_EXTENSIONS:
+                                continue
+                            caminho = os.path.join(base_dir, filename)
+                            arquivo.save(caminho)
+                            tamanho = os.path.getsize(caminho) if os.path.exists(caminho) else None
+
+                            from database import AnexoArquivo
+                            anexo = AnexoArquivo(
+                                chamado_id=novo_chamado.id,
+                                nome_original=arquivo.filename,
+                                caminho_arquivo=caminho.replace('\\', '/'),
+                                mime_type=arquivo.mimetype,
+                                tamanho_bytes=tamanho,
+                                usuario_id=current_user.id
+                            )
+                            db.session.add(anexo)
+                        db.session.commit()
+                except Exception as e:
+                    current_app.logger.error(f"Erro ao salvar anexos do chamado {codigo_gerado}: {str(e)}")
+                    db.session.rollback()
+
                 if hasattr(current_app, 'socketio'):
                     current_app.socketio.emit('novo_chamado', {
                         'id': novo_chamado.id,
@@ -502,6 +536,18 @@ def api_meus_chamados():
         chamados_list = []
         for chamado in chamados_paginados.items:
             data_abertura_brazil = chamado.get_data_abertura_brazil()
+            anexos_payload = []
+            try:
+                for a in getattr(chamado, 'anexos', []) or []:
+                    anexos_payload.append({
+                        'id': a.id,
+                        'nome': a.nome_original,
+                        'url': a.url_publica() if hasattr(a, 'url_publica') else ('/' + a.caminho_arquivo if a.caminho_arquivo else None),
+                        'tamanho_kb': round((a.tamanho_bytes or 0) / 1024)
+                    })
+            except Exception:
+                anexos_payload = []
+
             chamados_list.append({
                 'id': chamado.id,
                 'codigo': chamado.codigo,
@@ -513,7 +559,8 @@ def api_meus_chamados():
                 'prioridade': chamado.prioridade,
                 'data_abertura': data_abertura_brazil.strftime('%d/%m/%Y %H:%M') if data_abertura_brazil else 'Não informado',
                 'descricao': chamado.descricao or 'Sem descrição',
-                'data_visita': chamado.data_visita.strftime('%d/%m/%Y') if chamado.data_visita else None
+                'data_visita': chamado.data_visita.strftime('%d/%m/%Y') if chamado.data_visita else None,
+                'anexos': anexos_payload
             })
         
         return jsonify({

@@ -103,7 +103,7 @@ def login():
             if user.alterar_senha_primeiro_acesso:
                 return render_template('login.html', alterar_senha=True, usuario=user.usuario)
             
-            login_user(user, remember=bool(lembrar))
+            login_user(user, remember=True)
 
             # Registrar último acesso
             user.ultimo_acesso = datetime.utcnow()

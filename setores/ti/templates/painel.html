@@ -17,6 +17,14 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='ti/css/painel/painel.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='ti/css/painel/enviar_ticket.css') }}">
   <style>
+    .attachments-section { margin-top: 10px; }
+    .attachments-list { list-style: none; padding: 0; margin: 0; }
+    .attachments-list li { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+    .attachments-list a { color: var(--primary-color); text-decoration: underline; }
+    .history-section { margin-top: 10px; }
+    .history-list { list-style: none; padding: 0; margin: 0; }
+    .history-list li { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+    .history-icon { color: var(--primary-color); }
     @keyframes pulse {
       0% {
         transform: scale(1);
@@ -1950,7 +1958,7 @@
                   </label>
                 </div>
                 <div class="mb-3">
-                  <label for="tempoSessao" class="form-label">Tempo de sessão (minutos)</label>
+                  <label for="tempoSessao" class="form-label">Tempo de sess��o (minutos)</label>
                   <input type="number" class="form-control" id="tempoSessao" value="15" min="5" max="120">
                 </div>
                 <button class="btn btn-primary btn-sm" id="btnSalvarSeguranca">
@@ -2165,6 +2173,14 @@
         <p><strong>Unidade:</strong> <span id="modalUnidade"></span></p>
         <p class="full-width"><strong>Problema:</strong> <span id="modalProblema"></span></p>
         <p class="full-width"><strong>Descrição:</strong> <span id="modalDescricao"></span></p>
+        <div class="attachments-section" id="modalAnexosSection" style="display:none;">
+          <p class="full-width"><strong>Anexos:</strong></p>
+          <ul class="attachments-list" id="listaAnexos"></ul>
+        </div>
+        <div class="history-section" id="modalHistoricoSection" style="display:none;">
+          <p class="full-width"><strong>Histórico:</strong></p>
+          <ul class="history-list" id="listaHistorico"></ul>
+        </div>
         <p><strong>Visita técnica:</strong> <span id="modalVisita"></span></p>
         <p><strong>Data de abertura:</strong> <span id="modalData"></span></p>
         <label for="modalStatus">Alterar Status</label>
@@ -2341,6 +2357,12 @@
             <label class="form-check-label" for="ticketCopia">
               Enviar cópia para mim
             </label>
+          </div>
+
+          <div class="form-group mb-3">
+            <label for="ticketAnexos">Anexos (opcional)</label>
+            <input type="file" class="form-control" id="ticketAnexos" name="anexos" multiple accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx">
+            <small class="text-muted">Formatos permitidos: JPG, PNG, GIF, PDF, DOC, DOCX</small>
           </div>
         </form>
       </div>
