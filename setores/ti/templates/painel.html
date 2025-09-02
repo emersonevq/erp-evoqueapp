@@ -25,6 +25,10 @@
     .history-list { list-style: none; padding: 0; margin: 0; }
     .history-list li { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
     .history-icon { color: var(--primary-color); }
+    .history-card .card-header { display:flex; justify-content:space-between; align-items:center; }
+    .history-card .badge { font-size: .75rem; }
+    .history-attachment { display:flex; align-items:center; gap:8px; }
+    .history-attachment a { text-decoration: underline; }
     @keyframes pulse {
       0% {
         transform: scale(1);
@@ -145,7 +149,7 @@
           </ul>
         </li>
 
-        <li><a href="#historico" tabindex="0"><i class="fas fa-history"></i><span>Histórico</span></a></li>
+        <li><a href="#historico" tabindex="0"><i class="fas fa-history"></i><span>Histórico de chamados</span></a></li>
         <li><a href="#configuracoes" tabindex="0"><i class="fas fa-cog"></i><span>Configurações</span></a></li>
       </ul>
     </nav>
@@ -1426,7 +1430,7 @@
       </div>
     </section>
 
-    <!-- Dashboard Avançado -->
+    <!-- Dashboard Avan��ado -->
     <section id="dashboard-avancado" class="content-section" tabindex="0" aria-label="Dashboard Avançado">
       <div class="d-flex justify-content-between align-items-center mb-4">
         <h2><i class="fas fa-chart-pie me-2"></i>Dashboard Avançado</h2>
@@ -1693,24 +1697,15 @@
       </div>
     </section>
 
-    <!-- Histórico -->
-    <section id="historico" class="content-section" tabindex="0" aria-label="Histórico">
-      <h2>Histórico</h2>
-      <div class="table-responsive">
-        <table class="table table-dark table-striped">
-          <thead>
-            <tr>
-              <th>Data/Hora</th>
-              <th>Ação</th>
-              <th>Usuário</th>
-              <th>Descrição</th>
-            </tr>
-          </thead>
-          <tbody id="tabelaHistorico">
-            <!-- Histórico será carregado aqui dinamicamente -->
-          </tbody>
-        </table>
+    <!-- Histórico de chamados -->
+    <section id="historico" class="content-section" tabindex="0" aria-label="Histórico de chamados">
+      <h2>Histórico de chamados</h2>
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <label for="historicoChamadoSelect" class="form-label mb-0">Selecionar chamado</label>
+        <select id="historicoChamadoSelect" class="form-select" style="max-width: 320px;"></select>
+        <button class="btn btn-outline-secondary" id="btnAtualizarHistorico"><i class="fas fa-sync"></i> Atualizar</button>
       </div>
+      <div id="historicoCards" class="row g-3" aria-live="polite" aria-busy="false"></div>
     </section>
 
     <!-- Configurações -->
@@ -3190,7 +3185,7 @@
       }
     }
 
-    // Atualizar funç��o loadSectionContent para incluir prioridades
+    // Atualizar funç���o loadSectionContent para incluir prioridades
     function loadSectionContent(sectionId) {
       switch(sectionId) {
         case 'listar-unidades':

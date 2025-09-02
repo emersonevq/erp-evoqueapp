@@ -1134,14 +1134,13 @@ def atualizar_chamado_agente(chamado_id):
         # Adicionar observações se fornecidas
         observacoes = data.get('observacoes', '')
         if observacoes:
-            # Criar registro no hist��rico do ticket
             try:
                 historico = HistoricoTicket(
                     chamado_id=chamado.id,
-                    acao='Atualização do agente',
-                    detalhes=observacoes,
-                    usuario_responsavel=f"{current_user.nome} {current_user.sobrenome}",
-                    data_acao=get_brazil_time().replace(tzinfo=None)
+                    usuario_id=current_user.id,
+                    assunto=f"Atualização do Chamado {chamado.codigo}",
+                    mensagem=observacoes,
+                    destinatarios=chamado.email or ''
                 )
                 db.session.add(historico)
             except Exception as hist_error:
@@ -2208,9 +2207,9 @@ def listar_chamados():
                     'anexos': anexos_payload,
                     'historico': {
                         'assumido_por_nome': f"{c.status_assumido_por.nome} {c.status_assumido_por.sobrenome}" if getattr(c, 'status_assumido_por', None) else None,
-                        'assumido_em': c.status_assumido_em.strftime('%d/%m/%Y %H:%M') if getattr(c, 'status_assumido_em', None) else None,
+                        'assumido_em': c.status_assumido_em.strftime('%d/%m/%Y %H:%M') if getattr(c, 'status_assumido_em', None) else (c.get_data_primeira_resposta_brazil().strftime('%d/%m/%Y %H:%M') if c.get_data_primeira_resposta_brazil() else None),
                         'concluido_por_nome': f"{c.concluido_por.nome} {c.concluido_por.sobrenome}" if getattr(c, 'concluido_por', None) else None,
-                        'concluido_em': c.concluido_em.strftime('%d/%m/%Y %H:%M') if getattr(c, 'concluido_em', None) else None,
+                        'concluido_em': c.concluido_em.strftime('%d/%m/%Y %H:%M') if getattr(c, 'concluido_em', None) else (c.get_data_conclusao_brazil().strftime('%d/%m/%Y %H:%M') if c.get_data_conclusao_brazil() else None),
                         'cancelado_por_nome': f"{c.cancelado_por.nome} {c.cancelado_por.sobrenome}" if getattr(c, 'cancelado_por', None) else None,
                         'cancelado_em': c.cancelado_em.strftime('%d/%m/%Y %H:%M') if getattr(c, 'cancelado_em', None) else None
                     }
@@ -3088,7 +3087,7 @@ def deletar_usuario(user_id):
         except Exception as socket_error:
             logger.warning(f"Erro ao emitir evento Socket.IO: {str(socket_error)}")
         
-        logger.info(f"Usuário {nome_usuario} foi deletado")
+        logger.info(f"Usu��rio {nome_usuario} foi deletado")
         return json_response({'message': 'Usuário deletado com sucesso'})
     except Exception as e:
         db.session.rollback()
@@ -3175,6 +3174,124 @@ Suporte Evoque.
         logger.error(f"Erro ao enviar notificação: {str(e)}")
         logger.error(traceback.format_exc())
         return error_response('Erro interno ao enviar notificação')
+
+@painel_bp.route('/api/chamados/<int:chamado_id>/historico', methods=['GET'])
+@login_required
+@setor_required('ti')
+def obter_historico_chamado(chamado_id):
+    try:
+        chamado = Chamado.query.get(chamado_id)
+        if not chamado:
+            return error_response('Chamado não encontrado.', 404)
+
+        eventos = []
+
+        # Abertura
+        if chamado.data_abertura:
+            eventos.append({
+                'tipo': 'abertura',
+                'titulo': 'Chamado aberto',
+                'mensagem': f'Chamado {chamado.codigo} aberto por {chamado.solicitante}',
+                'usuario': chamado.solicitante,
+                'data': chamado.data_abertura.strftime('%Y-%m-%d %H:%M:%S')
+            })
+
+        # Primeira resposta / Assumido
+        if getattr(chamado, 'status_assumido_em', None) or getattr(chamado, 'data_primeira_resposta', None):
+            data_assumido = getattr(chamado, 'status_assumido_em', None) or getattr(chamado, 'data_primeira_resposta', None)
+            usuario_assumiu = None
+            try:
+                if getattr(chamado, 'status_assumido_por', None):
+                    usuario_assumiu = f"{chamado.status_assumido_por.nome} {chamado.status_assumido_por.sobrenome}"
+            except Exception:
+                pass
+            eventos.append({
+                'tipo': 'primeira_resposta',
+                'titulo': 'Primeira resposta',
+                'mensagem': 'Chamado assumido',
+                'usuario': usuario_assumiu,
+                'data': data_assumido.strftime('%Y-%m-%d %H:%M:%S') if data_assumido else None
+            })
+
+        # Conclusão / Cancelamento
+        if getattr(chamado, 'concluido_em', None):
+            usuario = None
+            try:
+                if getattr(chamado, 'concluido_por', None):
+                    usuario = f"{chamado.concluido_por.nome} {chamado.concluido_por.sobrenome}"
+            except Exception:
+                pass
+            eventos.append({
+                'tipo': 'conclusao',
+                'titulo': 'Chamado concluído',
+                'mensagem': 'Chamado finalizado',
+                'usuario': usuario,
+                'data': chamado.concluido_em.strftime('%Y-%m-%d %H:%M:%S')
+            })
+        if getattr(chamado, 'cancelado_em', None):
+            usuario = None
+            try:
+                if getattr(chamado, 'cancelado_por', None):
+                    usuario = f"{chamado.cancelado_por.nome} {chamado.cancelado_por.sobrenome}"
+            except Exception:
+                pass
+            eventos.append({
+                'tipo': 'cancelamento',
+                'titulo': 'Chamado cancelado',
+                'mensagem': 'Chamado cancelado',
+                'usuario': usuario,
+                'data': chamado.cancelado_em.strftime('%Y-%m-%d %H:%M:%S')
+            })
+
+        # Alterações de status via LogAcao (inclui reaberturas)
+        try:
+            logs = LogAcao.query.filter_by(tipo_recurso='chamado', recurso_afetado=str(chamado.id)).order_by(LogAcao.data_acao.asc()).all()
+            for log in logs:
+                eventos.append({
+                    'tipo': 'status',
+                    'titulo': 'Status alterado',
+                    'mensagem': log.detalhes,
+                    'usuario': None,
+                    'data': log.data_acao.strftime('%Y-%m-%d %H:%M:%S') if log.data_acao else None
+                })
+        except Exception:
+            pass
+
+        # Tickets enviados e anexos
+        try:
+            historicos = HistoricoTicket.query.filter_by(chamado_id=chamado.id).order_by(HistoricoTicket.data_envio.asc()).all()
+            from database import AnexoArquivo
+            for h in historicos:
+                anexos = []
+                try:
+                    anexos_q = AnexoArquivo.query.filter_by(historico_ticket_id=h.id).all()
+                    for a in anexos_q:
+                        anexos.append({
+                            'id': a.id,
+                            'nome': a.nome_original,
+                            'url': a.url_publica(),
+                            'tamanho_kb': round((a.tamanho_bytes or 0) / 1024)
+                        })
+                except Exception:
+                    anexos = []
+                eventos.append({
+                    'tipo': 'ticket',
+                    'titulo': h.assunto,
+                    'mensagem': h.mensagem,
+                    'usuario': None,
+                    'data': h.data_envio.strftime('%Y-%m-%d %H:%M:%S') if h.data_envio else None,
+                    'anexos': anexos
+                })
+        except Exception:
+            pass
+
+        # Ordenar por data asc
+        eventos.sort(key=lambda e: e.get('data') or '')
+        return json_response({'chamado': {'id': chamado.id, 'codigo': chamado.codigo}, 'eventos': eventos})
+    except Exception as e:
+        logger.error(f"Erro ao obter histórico do chamado {chamado_id}: {str(e)}")
+        logger.error(traceback.format_exc())
+        return error_response('Erro interno ao obter histórico')
 
 @painel_bp.route('/api/chamados/<int:id>/ticket', methods=['POST'])
 @login_required
@@ -3472,7 +3589,7 @@ def obter_chamados_detalhados_sla():
 def limpar_historico_violacoes_sla():
     """Limpa histórico de violações de SLA corrigindo datas de conclusão faltantes"""
     try:
-        logger.info(f"Iniciando limpeza de histórico SLA - usuário: {current_user.usuario}")
+        logger.info(f"Iniciando limpeza de histórico SLA - usu��rio: {current_user.usuario}")
 
         from datetime import datetime, timedelta
 
