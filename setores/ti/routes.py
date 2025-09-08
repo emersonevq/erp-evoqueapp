@@ -440,7 +440,13 @@ def abrir_chamado():
                                     usuario_id=current_user.id,
                                     tipo='attachment_received',
                                     descricao=f'Anexo recebido na abertura: {arquivo.filename}',
-                                    anexo_id=anexo.id
+                                    anexo_id=anexo.id,
+                                    metadados=json.dumps({
+                                        'arquivo_nome': arquivo.filename,
+                                        'mime_type': arquivo.mimetype,
+                                        'tamanho_bytes': tamanho,
+                                        'origem': 'solicitante'
+                                    })
                                 )
                                 db.session.add(evento_anexo)
                             except Exception as e:
