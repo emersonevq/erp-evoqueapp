@@ -2407,9 +2407,24 @@ def atualizar_status_chamado(id):
         chamado = Chamado.query.get(id)
         if not chamado:
             return error_response('Chamado não encontrado.', 404)
-        
+
         status_anterior = chamado.status
         chamado.status = novo_status
+
+        # Registrar evento de alteração de status
+        try:
+            from database import ChamadoTimelineEvent
+            evento_status = ChamadoTimelineEvent(
+                chamado_id=chamado.id,
+                usuario_id=getattr(current_user, 'id', None),
+                tipo='status_change',
+                descricao=f'Status alterado de {status_anterior} para {novo_status}',
+                status_anterior=status_anterior,
+                status_novo=novo_status
+            )
+            db.session.add(evento_status)
+        except Exception as e:
+            logger.warning(f"Falha ao registrar timeline de status: {str(e)}")
 
         # Atualizar campos de SLA baseado na mudança de status
         agora_brazil = get_brazil_time()
@@ -4137,7 +4152,7 @@ def listar_alertas():
                 'id': 1,
                 'tipo': 'warning',
                 'titulo': 'Uso de Memória Alto',
-                'mensagem': 'O servidor está usando 85% da memória disponível',
+                'mensagem': 'O servidor está usando 85% da memória dispon��vel',
                 'data': '2025-01-31 10:30:00',
                 'status': 'ativo',
                 'prioridade': 'alta'
