@@ -6,6 +6,7 @@ import os
 import pytz
 import unicodedata
 from sqlalchemy import Numeric
+from sqlalchemy.dialects.mysql import JSON as MySQLJSON
 
 db = SQLAlchemy()
 
@@ -301,7 +302,7 @@ class AnexoArquivo(db.Model):
 
 class HistoricoTicket(db.Model):
     __tablename__ = 'historicos_tickets'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     chamado_id = db.Column(db.Integer, db.ForeignKey('chamado.id'), nullable=False)
     usuario_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -309,12 +310,32 @@ class HistoricoTicket(db.Model):
     mensagem = db.Column(db.Text, nullable=False)
     destinatarios = db.Column(db.String(255), nullable=False)
     data_envio = db.Column(db.DateTime, default=lambda: get_brazil_time().replace(tzinfo=None))
-    
+
     chamado = db.relationship('Chamado', backref='tickets_enviados')
     usuario = db.relationship('User', backref='tickets_enviados')
 
     def __repr__(self):
         return f'<HistoricoTicket {self.id} - Chamado {self.chamado_id}>'
+
+class ChamadoTimelineEvent(db.Model):
+    __tablename__ = 'chamado_timeline'
+
+    id = db.Column(db.Integer, primary_key=True)
+    chamado_id = db.Column(db.Integer, db.ForeignKey('chamado.id'), nullable=False)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    tipo = db.Column(db.String(50), nullable=False)  # created, status_change, attachment_received, attachment_sent, ticket_sent
+    descricao = db.Column(db.Text, nullable=True)
+    status_anterior = db.Column(db.String(50), nullable=True)
+    status_novo = db.Column(db.String(50), nullable=True)
+    anexo_id = db.Column(db.Integer, db.ForeignKey('anexos_arquivos.id'), nullable=True)
+    metadados = db.Column(db.Text, nullable=True)
+    criado_em = db.Column(db.DateTime, default=lambda: get_brazil_time().replace(tzinfo=None))
+
+    chamado = db.relationship('Chamado', backref='timeline_eventos')
+    usuario = db.relationship('User')
+
+    def __repr__(self):
+        return f'<ChamadoTimelineEvent {self.tipo} - Chamado {self.chamado_id}>'
 
 class Configuracao(db.Model):
     __tablename__ = 'configuracoes'
