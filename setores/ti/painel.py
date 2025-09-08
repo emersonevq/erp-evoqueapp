@@ -443,7 +443,7 @@ def setup_demo_page():
     '''
 
 def carregar_configuracoes():
-    """Carrega configurações do banco de dados ou retorna padr����es"""
+    """Carrega configurações do banco de dados ou retorna padr�����es"""
     try:
         config_final = CONFIGURACOES_PADRAO.copy()
 
@@ -1119,6 +1119,21 @@ def atualizar_chamado_agente(chamado_id):
             if novo_status in ['Aberto', 'Aguardando', 'Concluido', 'Cancelado']:
                 status_anterior = chamado.status
                 chamado.status = novo_status
+
+                # Registrar evento de alteração de status
+                try:
+                    from database import ChamadoTimelineEvent
+                    evento_status = ChamadoTimelineEvent(
+                        chamado_id=chamado.id,
+                        usuario_id=current_user.id,
+                        tipo='status_change',
+                        descricao=f'Status alterado de {status_anterior} para {novo_status}',
+                        status_anterior=status_anterior,
+                        status_novo=novo_status
+                    )
+                    db.session.add(evento_status)
+                except Exception as e:
+                    logger.warning(f"Falha ao registrar timeline de status: {str(e)}")
 
                 # Atualizar campos de SLA baseado na mudança de status
                 agora_brazil = get_brazil_time()
@@ -2135,19 +2150,37 @@ def remover_unidade(id):
 @setor_required('ti')
 def listar_chamados():
     try:
-        logger.debug("Iniciando consulta de chamados...")
+        logger.debug("Iniciando consulta de chamados (otimizada)...")
         from database import ChamadoAgente, AgenteSuporte, User
+        from sqlalchemy.orm import selectinload
 
-        # Fazer join com agentes se existir
-        chamados = db.session.query(Chamado).outerjoin(
-            ChamadoAgente, (Chamado.id == ChamadoAgente.chamado_id) & (ChamadoAgente.ativo == True)
-        ).outerjoin(
-            AgenteSuporte, ChamadoAgente.agente_id == AgenteSuporte.id
-        ).outerjoin(
-            User, AgenteSuporte.usuario_id == User.id
-        ).order_by(Chamado.data_abertura.desc()).all()
+        # Carregar chamados com anexos via selectinload (evita N+1)
+        chamados = (
+            Chamado.query.options(selectinload(Chamado.anexos))
+            .order_by(Chamado.data_abertura.desc())
+            .all()
+        )
 
         logger.debug(f"Total de chamados encontrados: {len(chamados)}")
+
+        # Pré-buscar agente atribuído para todos os chamados em UMA query
+        ids = [c.id for c in chamados]
+        agentes_map = {}
+        if ids:
+            atribs = (
+                db.session.query(ChamadoAgente, AgenteSuporte, User)
+                .join(AgenteSuporte, ChamadoAgente.agente_id == AgenteSuporte.id)
+                .join(User, AgenteSuporte.usuario_id == User.id)
+                .filter(ChamadoAgente.ativo == True, ChamadoAgente.chamado_id.in_(ids))
+                .all()
+            )
+            for ca, ag, usr in atribs:
+                agentes_map[ca.chamado_id] = {
+                    'id': ag.id,
+                    'nome': f"{usr.nome} {usr.sobrenome}",
+                    'usuario': usr.usuario,
+                    'nivel_experiencia': ag.nivel_experiencia
+                }
 
         chamados_list = []
         for c in chamados:
@@ -2159,20 +2192,8 @@ def listar_chamados():
                 # Converter data de visita se existir
                 data_visita_str = c.data_visita.strftime('%d/%m/%Y') if c.data_visita else None
 
-                # Buscar agente atribuído
-                agente_info = None
-                chamado_agente = ChamadoAgente.query.filter_by(
-                    chamado_id=c.id,
-                    ativo=True
-                ).first()
-
-                if chamado_agente and chamado_agente.agente:
-                    agente_info = {
-                        'id': chamado_agente.agente.id,
-                        'nome': f"{chamado_agente.agente.usuario.nome} {chamado_agente.agente.usuario.sobrenome}",
-                        'usuario': chamado_agente.agente.usuario.usuario,
-                        'nivel_experiencia': chamado_agente.agente.nivel_experiencia
-                    }
+                # Buscar agente atribuído (via mapa pré-carregado)
+                agente_info = agentes_map.get(c.id)
 
                 anexos_payload = []
                 try:
@@ -2392,9 +2413,24 @@ def atualizar_status_chamado(id):
         chamado = Chamado.query.get(id)
         if not chamado:
             return error_response('Chamado não encontrado.', 404)
-        
+
         status_anterior = chamado.status
         chamado.status = novo_status
+
+        # Registrar evento de alteração de status
+        try:
+            from database import ChamadoTimelineEvent
+            evento_status = ChamadoTimelineEvent(
+                chamado_id=chamado.id,
+                usuario_id=getattr(current_user, 'id', None),
+                tipo='status_change',
+                descricao=f'Status alterado de {status_anterior} para {novo_status}',
+                status_anterior=status_anterior,
+                status_novo=novo_status
+            )
+            db.session.add(evento_status)
+        except Exception as e:
+            logger.warning(f"Falha ao registrar timeline de status: {str(e)}")
 
         # Atualizar campos de SLA baseado na mudança de status
         agora_brazil = get_brazil_time()
@@ -3848,7 +3884,7 @@ def sincronizar_sla_database():
             tipo_recurso='sla'
         )
 
-        logger.info(f"Sincronização SLA concluída: {configuracoes_corrigidas} configs, {chamados_corrigidos} chamados, {feriados_adicionados} feriados")
+        logger.info(f"Sincronizaç��o SLA concluída: {configuracoes_corrigidas} configs, {chamados_corrigidos} chamados, {feriados_adicionados} feriados")
 
         return json_response({
             'success': True,
@@ -4059,7 +4095,22 @@ def atualizar_status_setor_usuario():
         
         status_anterior = chamado.status
         chamado.status = novo_status
-        
+
+        # Registrar evento de alteração de status
+        try:
+            from database import ChamadoTimelineEvent
+            evento_status = ChamadoTimelineEvent(
+                chamado_id=chamado.id,
+                usuario_id=getattr(current_user, 'id', None),
+                tipo='status_change',
+                descricao=f'Status alterado de {status_anterior} para {novo_status}',
+                status_anterior=status_anterior,
+                status_novo=novo_status
+            )
+            db.session.add(evento_status)
+        except Exception as e:
+            logger.warning(f"Falha ao registrar timeline de status: {str(e)}")
+
         # Atualizar campos de SLA baseado na mudança de status
         agora_brazil = get_brazil_time()
         

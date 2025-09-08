@@ -148,7 +148,7 @@ def enviar_email(assunto, corpo, destinatarios=None):
         "saveToSentItems": "false"
     }
 
-    current_app.logger.info(f"📦 Email data preparado para: {[r['emailAddress']['address'] for r in email_data['message']['toRecipients']]}")
+    current_app.logger.info(f"�� Email data preparado para: {[r['emailAddress']['address'] for r in email_data['message']['toRecipients']]}")
 
     try:
         response = requests.post(ENDPOINT, headers=headers, json=email_data)
@@ -386,6 +386,22 @@ def abrir_chamado():
                 db.session.add(novo_chamado)
                 db.session.commit()
 
+                # Registrar evento de criação na linha do tempo
+                try:
+                    from database import ChamadoTimelineEvent
+                    evento_criacao = ChamadoTimelineEvent(
+                        chamado_id=novo_chamado.id,
+                        usuario_id=current_user.id,
+                        tipo='created',
+                        descricao='Chamado criado',
+                        status_anterior=None,
+                        status_novo='Aberto'
+                    )
+                    db.session.add(evento_criacao)
+                    db.session.commit()
+                except Exception as e:
+                    current_app.logger.warning(f"Falha ao registrar timeline de criação: {str(e)}")
+
                 # Processar anexos enviados
                 try:
                     from werkzeug.utils import secure_filename
@@ -405,7 +421,7 @@ def abrir_chamado():
                             arquivo.save(caminho)
                             tamanho = os.path.getsize(caminho) if os.path.exists(caminho) else None
 
-                            from database import AnexoArquivo
+                            from database import AnexoArquivo, ChamadoTimelineEvent
                             anexo = AnexoArquivo(
                                 chamado_id=novo_chamado.id,
                                 nome_original=arquivo.filename,
@@ -415,6 +431,20 @@ def abrir_chamado():
                                 usuario_id=current_user.id
                             )
                             db.session.add(anexo)
+                            db.session.flush()
+
+                            # Registrar timeline do anexo recebido na abertura
+                            try:
+                                evento_anexo = ChamadoTimelineEvent(
+                                    chamado_id=novo_chamado.id,
+                                    usuario_id=current_user.id,
+                                    tipo='attachment_received',
+                                    descricao=f'Anexo recebido na abertura: {arquivo.filename}',
+                                    anexo_id=anexo.id
+                                )
+                                db.session.add(evento_anexo)
+                            except Exception as e:
+                                current_app.logger.warning(f"Falha ao registrar timeline de anexo: {str(e)}")
                         db.session.commit()
                 except Exception as e:
                     current_app.logger.error(f"Erro ao salvar anexos do chamado {codigo_gerado}: {str(e)}")

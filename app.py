@@ -4,6 +4,7 @@ from config import get_config
 from flask_login import LoginManager
 from database import db, seed_unidades, User, Chamado, Unidade, ProblemaReportado, ItemInternet, HistoricoTicket, Configuracao
 from setores.ti.routes import ti_bp
+from setores.ti.timeline_api import timeline_bp
 from auth.routes import auth_bp
 from principal.routes import main_bp
 from setores.compras.compras import compras_bp
@@ -114,6 +115,7 @@ def favicon():
 app.register_blueprint(main_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(ti_bp, url_prefix='/ti')
+app.register_blueprint(timeline_bp, url_prefix='/ti')
 app.register_blueprint(compras_bp, url_prefix='/compras')
 app.register_blueprint(financeiro_bp, url_prefix='/financeiro')
 app.register_blueprint(manutencao)

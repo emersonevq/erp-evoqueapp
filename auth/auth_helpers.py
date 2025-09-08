@@ -41,6 +41,16 @@ def setor_required(*setores_necessarios):
                 current_app.logger.error(f"Erro ao atualizar último acesso: {str(e)}")
                 db.session.rollback()
             
+            # Recarregar o usuário do banco para refletir permissões atualizadas em tempo real
+            try:
+                db.session.refresh(current_user)
+            except Exception:
+                try:
+                    from database import User
+                    _ = User.query.get(current_user.id)
+                except Exception:
+                    pass
+
             # Verifica se o usuário tem acesso a algum dos setores necessários
             tem_acesso = any(
                 current_user.tem_acesso_setor(setor)
