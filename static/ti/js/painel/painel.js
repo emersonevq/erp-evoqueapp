@@ -1004,29 +1004,25 @@ async function openModal(chamado) {
     modalData.textContent = chamado.data_abertura.split(' ')[0];
     modalStatusSelect.value = chamado.status;
 
-    // Anexos
-    const anexosSection = document.getElementById('modalAnexosSection');
-    const listaAnexos = document.getElementById('listaAnexos');
-    if (listaAnexos && anexosSection) {
-        listaAnexos.innerHTML = '';
-        if (Array.isArray(chamado.anexos) && chamado.anexos.length > 0) {
-            anexosSection.style.display = 'block';
-            chamado.anexos.forEach(ax => {
-                const li = document.createElement('li');
-                li.innerHTML = `<i class=\"fas fa-paperclip\"></i><a href=\"${ax.url}\" target=\"_blank\" rel=\"noopener\">${ax.nome} ${ax.tamanho_kb ? `(${ax.tamanho_kb} KB)` : ''}</a>`;
-                listaAnexos.appendChild(li);
-            });
-        } else {
-            anexosSection.style.display = 'none';
-        }
-    }
-
-    // Histórico (status básicos) + Timeline do servidor
-    const historicoSection = document.getElementById('modalHistoricoSection');
-    const listaHistorico = document.getElementById('listaHistorico');
-    if (listaHistorico && historicoSection) {
-        listaHistorico.innerHTML = '';
+    // Historico em aba dedicada (linha do tempo unificada)
+    const timelineList = document.getElementById('timelineList');
+    if (timelineList) {
         const itens = [];
+
+        // Evento inicial: chamado aberto
+        if (chamado.data_abertura) {
+            itens.push(`<li><i class=\"fas fa-plus-circle history-icon\"></i><span>Chamado aberto - ${chamado.data_abertura}</span></li>`);
+        }
+
+        // Anexos do solicitante como eventos
+        if (Array.isArray(chamado.anexos) && chamado.anexos.length > 0) {
+            chamado.anexos.forEach(ax => {
+                const size = ax.tamanho_kb ? ` (${ax.tamanho_kb} KB)` : '';
+                itens.push(`<li><i class=\"fas fa-paperclip history-icon\"></i><span>Anexo do solicitante: <a href=\"${ax.url}\" target=\"_blank\" rel=\"noopener\">${ax.nome}${size}</a></span></li>`);
+            });
+        }
+
+        // Status básicos (assumido, concluído, cancelado)
         const h = chamado.historico || {};
         if (h.assumido_por_nome && h.assumido_em) {
             itens.push(`<li><i class=\"fas fa-user-check history-icon\"></i><span>Assumido por ${h.assumido_por_nome} em ${h.assumido_em}</span></li>`);
@@ -1037,7 +1033,8 @@ async function openModal(chamado) {
         if (h.cancelado_por_nome && h.cancelado_em) {
             itens.push(`<li><i class=\"fas fa-times-circle history-icon\"></i><span>Cancelado por ${h.cancelado_por_nome} em ${h.cancelado_em}</span></li>`);
         }
-        // Buscar timeline completa do backend
+
+        // Timeline completa do backend (mensagens de ticket, anexos do suporte, mudanças de status)
         try {
             const tlResp = await fetch(`/ti/api/chamados/${chamado.id}/timeline`, { headers: { 'Accept': 'application/json' } });
             if (tlResp.ok) {
@@ -1051,8 +1048,6 @@ async function openModal(chamado) {
                     else if (ev.tipo === 'ticket_sent') icon = 'fa-envelope';
 
                     const anexoHtml = ev.anexo ? ` <a href=\"${ev.anexo.url}\" target=\"_blank\" rel=\"noopener\">${ev.anexo.nome}</a>` : '';
-
-                    // Montar remetente (quem realizou a ação)
                     const senderParts = [];
                     if (ev.autor_tipo) senderParts.push(ev.autor_tipo);
                     if (ev.usuario_nome) senderParts.push(`(${ev.usuario_nome})`);
@@ -1065,13 +1060,26 @@ async function openModal(chamado) {
             console.warn('Falha ao carregar timeline:', e);
         }
 
-        if (itens.length > 0) {
-            historicoSection.style.display = 'block';
-            listaHistorico.innerHTML = itens.join('');
-        } else {
-            historicoSection.style.display = 'none';
-        }
+        timelineList.innerHTML = itens.join('');
     }
+
+    // Controle das abas do modal
+    const tabs = document.querySelectorAll('#modalChamado .tab-button');
+    const panes = document.querySelectorAll('#modalChamado .tab-pane');
+    tabs.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            tabs.forEach(b => b.classList.remove('active'));
+            panes.forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+            const target = document.getElementById(btn.dataset.tab);
+            if (target) target.classList.add('active');
+        });
+    });
+
+    // Garantir que a aba de detalhes inicie ativa
+    document.querySelector('#modalChamado .tab-button[data-tab="detalhesTab"]')?.classList.add('active');
+    document.getElementById('detalhesTab')?.classList.add('active');
 
     modal.classList.add('active');
 }
@@ -1210,7 +1218,7 @@ document.getElementById('btnGerarSenha')?.addEventListener('click', function(e) 
     gerarSenha();
 });
 
-// Funç��o para validar dados do usuário
+// Funç���o para validar dados do usuário
 function validarDadosUsuario(dados) {
     const erros = [];
     
@@ -1302,7 +1310,7 @@ document.getElementById('formCriarUsuario')?.addEventListener('submit', async fu
 
                 if (agenteResponse.ok) {
                     if (window.advancedNotificationSystem) {
-                        window.advancedNotificationSystem.showSuccess('Usuário e Agente Criados', `Usuário ${data.nome} criado e registrado como agente de suporte!`);
+                        window.advancedNotificationSystem.showSuccess('Usuário e Agente Criados', `Usu��rio ${data.nome} criado e registrado como agente de suporte!`);
                     }
                 } else {
                     if (window.advancedNotificationSystem) {
