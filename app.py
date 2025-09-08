@@ -4,6 +4,7 @@ from config import get_config
 from flask_login import LoginManager
 from database import db, seed_unidades, User, Chamado, Unidade, ProblemaReportado, ItemInternet, HistoricoTicket, Configuracao
 from setores.ti.routes import ti_bp
+from setores.ti.timeline_api import timeline_bp
 from auth.routes import auth_bp
 from principal.routes import main_bp
 from setores.compras.compras import compras_bp
@@ -438,7 +439,7 @@ Agora você pode usar com segurança a funcionalidade "Esqueci minha senha"!
             <p><strong>Destinatário:</strong> {destinatario}</p>
             <p><strong>Assunto:</strong> {assunto}</p>
             <div style="background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                <h3>🎉 Configuração funcionando perfeitamente!</h3>
+                <h3>��� Configuração funcionando perfeitamente!</h3>
                 <p>O sistema de email Microsoft Graph está operacional. Verifique sua caixa de entrada.</p>
             </div>
             <h3>✅ Funcionalidades habilitadas:</h3>
