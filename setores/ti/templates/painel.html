@@ -2157,6 +2157,16 @@
     </div>
   </div>
 
+  <style>
+    .modal-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+    .modal-tabs .tab-button { background: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+    .modal-tabs .tab-button.active { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+    .timeline-list { list-style: none; padding: 0; margin: 0; }
+    .timeline-list li { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+    .timeline-list .history-icon { color: var(--primary-color); }
+  </style>
   <!-- Modal Detalhes do Chamado -->
   <div class="modal" id="modalChamado" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalDesc">
     <div class="modal-content">
@@ -2165,31 +2175,34 @@
         <button class="modal-close" aria-label="Fechar modal" id="modalClose">&times;</button>
       </div>
       <div class="modal-body" id="modalBody">
-        <p><strong>Código:</strong> <span id="modalCodigo"></span></p>
-        <p><strong>Protocolo:</strong> <span id="modalProtocolo"></span></p>
-        <p><strong>Solicitante:</strong> <span id="modalSolicitante"></span></p>
-        <p><strong>Cargo:</strong> <span id="modalCargo"></span></p>
-        <p><strong>Telefone:</strong> <span id="modalTelefone"></span></p>
-        <p><strong>Unidade:</strong> <span id="modalUnidade"></span></p>
-        <p class="full-width"><strong>Problema:</strong> <span id="modalProblema"></span></p>
-        <p class="full-width"><strong>Descrição:</strong> <span id="modalDescricao"></span></p>
-        <div class="attachments-section" id="modalAnexosSection" style="display:none;">
-          <p class="full-width"><strong>Anexos:</strong></p>
-          <ul class="attachments-list" id="listaAnexos"></ul>
+        <div class="modal-tabs" id="modalTabs">
+          <button type="button" class="tab-button active" data-tab="detalhesTab">Detalhes</button>
+          <button type="button" class="tab-button" data-tab="historicoTab">Histórico</button>
         </div>
-        <div class="history-section" id="modalHistoricoSection" style="display:none;">
-          <p class="full-width"><strong>Histórico:</strong></p>
-          <ul class="history-list" id="listaHistorico"></ul>
+        <div class="tab-content">
+          <div id="detalhesTab" class="tab-pane active">
+            <p><strong>Código:</strong> <span id="modalCodigo"></span></p>
+            <p><strong>Protocolo:</strong> <span id="modalProtocolo"></span></p>
+            <p><strong>Solicitante:</strong> <span id="modalSolicitante"></span></p>
+            <p><strong>Cargo:</strong> <span id="modalCargo"></span></p>
+            <p><strong>Telefone:</strong> <span id="modalTelefone"></span></p>
+            <p><strong>Unidade:</strong> <span id="modalUnidade"></span></p>
+            <p class="full-width"><strong>Problema:</strong> <span id="modalProblema"></span></p>
+            <p class="full-width"><strong>Descrição:</strong> <span id="modalDescricao"></span></p>
+            <p><strong>Visita técnica:</strong> <span id="modalVisita"></span></p>
+            <p><strong>Data de abertura:</strong> <span id="modalData"></span></p>
+            <label for="modalStatus">Alterar Status</label>
+            <select id="modalStatus" aria-label="Alterar status do chamado">
+              <option value="Aberto">Aberto</option>
+              <option value="Aguardando">Aguardando</option>
+              <option value="Concluido">Concluído</option>
+              <option value="Cancelado">Cancelado</option>
+            </select>
+          </div>
+          <div id="historicoTab" class="tab-pane">
+            <ul class="timeline-list" id="timelineList"></ul>
+          </div>
         </div>
-        <p><strong>Visita técnica:</strong> <span id="modalVisita"></span></p>
-        <p><strong>Data de abertura:</strong> <span id="modalData"></span></p>
-        <label for="modalStatus">Alterar Status</label>
-        <select id="modalStatus" aria-label="Alterar status do chamado">
-          <option value="Aberto">Aberto</option>
-          <option value="Aguardando">Aguardando</option>
-          <option value="Concluido">Concluído</option>
-          <option value="Cancelado">Cancelado</option>
-        </select>
       </div>
       <div class="modal-footer">
         <button class="btn btn-danger" id="modalDelete">
