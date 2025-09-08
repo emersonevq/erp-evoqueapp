@@ -73,10 +73,12 @@ def backfill_timeline(app):
 
         # 3) Tickets enviados (HistoricoTicket)
         historicos = HistoricoTicket.query.all()
+        import json as _json
         for h in historicos:
             existe = (
                 ChamadoTimelineEvent.query
-                .filter_by(chamado_id=h.chamado_id, tipo='ticket_sent', descricao=h.assunto)
+                .filter_by(chamado_id=h.chamado_id, tipo='ticket_sent')
+                .filter(ChamadoTimelineEvent.descricao.like(f"%{h.assunto}%"))
                 .first()
             )
             if not existe:
@@ -85,6 +87,11 @@ def backfill_timeline(app):
                     usuario_id=h.usuario_id,
                     tipo='ticket_sent',
                     descricao=f'E-mail enviado: {h.assunto} para {h.destinatarios}',
+                    metadados=_json.dumps({
+                        'assunto': h.assunto,
+                        'mensagem': h.mensagem,
+                        'destinatarios': (h.destinatarios or '').split(',') if h.destinatarios else []
+                    }),
                     criado_em=(h.data_envio or None)
                 )
                 db.session.add(ev)
@@ -107,6 +114,12 @@ def backfill_timeline(app):
                     usuario_id=getattr(a, 'usuario_id', None),
                     tipo='attachment_sent',
                     descricao=f'Anexo enviado: {a.nome_original}',
+                    metadados=_json.dumps({
+                        'arquivo_nome': a.nome_original,
+                        'mime_type': a.mime_type,
+                        'tamanho_bytes': a.tamanho_bytes,
+                        'origem': 'suporte'
+                    }),
                     anexo_id=a.id,
                     criado_em=(a.data_upload or None)
                 )

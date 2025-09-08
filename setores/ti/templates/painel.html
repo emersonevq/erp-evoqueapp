@@ -2165,31 +2165,38 @@
         <button class="modal-close" aria-label="Fechar modal" id="modalClose">&times;</button>
       </div>
       <div class="modal-body" id="modalBody">
-        <p><strong>Código:</strong> <span id="modalCodigo"></span></p>
-        <p><strong>Protocolo:</strong> <span id="modalProtocolo"></span></p>
-        <p><strong>Solicitante:</strong> <span id="modalSolicitante"></span></p>
-        <p><strong>Cargo:</strong> <span id="modalCargo"></span></p>
-        <p><strong>Telefone:</strong> <span id="modalTelefone"></span></p>
-        <p><strong>Unidade:</strong> <span id="modalUnidade"></span></p>
-        <p class="full-width"><strong>Problema:</strong> <span id="modalProblema"></span></p>
-        <p class="full-width"><strong>Descrição:</strong> <span id="modalDescricao"></span></p>
-        <div class="attachments-section" id="modalAnexosSection" style="display:none;">
-          <p class="full-width"><strong>Anexos:</strong></p>
-          <ul class="attachments-list" id="listaAnexos"></ul>
+        <ul class="nav nav-tabs mb-3" id="modalChamadoTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-detalhes" data-bs-toggle="tab" data-bs-target="#detalhesTab" type="button" role="tab" aria-controls="detalhesTab" aria-selected="true">Detalhes</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-historico" data-bs-toggle="tab" data-bs-target="#historicoTab" type="button" role="tab" aria-controls="historicoTab" aria-selected="false">Histórico</button>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div id="detalhesTab" class="tab-pane fade show active" role="tabpanel" aria-labelledby="tab-detalhes">
+            <p><strong>Código:</strong> <span id="modalCodigo"></span></p>
+            <p><strong>Protocolo:</strong> <span id="modalProtocolo"></span></p>
+            <p><strong>Solicitante:</strong> <span id="modalSolicitante"></span></p>
+            <p><strong>Cargo:</strong> <span id="modalCargo"></span></p>
+            <p><strong>Telefone:</strong> <span id="modalTelefone"></span></p>
+            <p><strong>Unidade:</strong> <span id="modalUnidade"></span></p>
+            <p class="full-width"><strong>Problema:</strong> <span id="modalProblema"></span></p>
+            <p class="full-width"><strong>Descrição:</strong> <span id="modalDescricao"></span></p>
+            <p><strong>Visita técnica:</strong> <span id="modalVisita"></span></p>
+            <p><strong>Data de abertura:</strong> <span id="modalData"></span></p>
+            <label for="modalStatus">Alterar Status</label>
+            <select id="modalStatus" aria-label="Alterar status do chamado">
+              <option value="Aberto">Aberto</option>
+              <option value="Aguardando">Aguardando</option>
+              <option value="Concluido">Concluído</option>
+              <option value="Cancelado">Cancelado</option>
+            </select>
+          </div>
+          <div id="historicoTab" class="tab-pane fade" role="tabpanel" aria-labelledby="tab-historico">
+            <ul class="history-list" id="timelineList"></ul>
+          </div>
         </div>
-        <div class="history-section" id="modalHistoricoSection" style="display:none;">
-          <p class="full-width"><strong>Histórico:</strong></p>
-          <ul class="history-list" id="listaHistorico"></ul>
-        </div>
-        <p><strong>Visita técnica:</strong> <span id="modalVisita"></span></p>
-        <p><strong>Data de abertura:</strong> <span id="modalData"></span></p>
-        <label for="modalStatus">Alterar Status</label>
-        <select id="modalStatus" aria-label="Alterar status do chamado">
-          <option value="Aberto">Aberto</option>
-          <option value="Aguardando">Aguardando</option>
-          <option value="Concluido">Concluído</option>
-          <option value="Cancelado">Cancelado</option>
-        </select>
       </div>
       <div class="modal-footer">
         <button class="btn btn-danger" id="modalDelete">
@@ -3434,7 +3441,7 @@ async function salvarConfiguracoesChamados() {
         
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.error || 'Erro ao salvar configurações');
+            throw new Error(error.error || 'Erro ao salvar configura��ões');
         }
         
         const data = await response.json();

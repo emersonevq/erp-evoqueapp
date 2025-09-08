@@ -1345,6 +1345,45 @@ select option:checked {
     gap: var(--spacing-md);
 }
 
+/* Tabs ocupam toda a largura do grid no modal */
+#modalChamado .modal-body .nav-tabs,
+#modalChamado .modal-body .tab-content {
+  grid-column: 1 / -1;
+}
+
+/* Estilo das abas de navegação dentro do modal */
+#modalChamado .nav-tabs {
+  background: var(--dark-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: var(--spacing-xs);
+}
+
+#modalChamado .nav-tabs .nav-link {
+  color: var(--text-light);
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+  transition: all 0.2s ease;
+}
+
+#modalChamado .nav-tabs .nav-link:hover {
+  color: var(--light-color);
+  background: rgba(255, 98, 0, 0.08);
+}
+
+#modalChamado .nav-tabs .nav-link.active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+}
+
+#modalChamado .tab-content {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: var(--spacing-md);
+}
+
 .modal-body p {
     margin: 0;
     padding: var(--spacing-sm);
@@ -1398,6 +1437,49 @@ select option:checked {
     background: var(--dark-color);
     color: var(--light-color);
     padding: var(--spacing-sm);
+}
+
+/* Timeline/Histórico */
+#modalChamado .history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 1.25rem;
+  position: relative;
+}
+
+#modalChamado .history-list::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border-color);
+}
+
+#modalChamado .history-list li {
+  position: relative;
+  padding: 0.5rem 0 0.5rem 0.75rem;
+  color: var(--light-color);
+}
+
+#modalChamado .history-list li + li {
+  border-top: 1px dashed var(--border-color);
+}
+
+#modalChamado .history-list .history-icon {
+  position: absolute;
+  left: -0.5rem;
+  top: 0.7rem;
+  color: var(--primary-color);
+  background: var(--dark-color);
+  border-radius: 50%;
+  padding: 2px;
+}
+
+#modalChamado .history-list a {
+  color: var(--info-color);
+  text-decoration: underline;
 }
 
 .modal-footer {

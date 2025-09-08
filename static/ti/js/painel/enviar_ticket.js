@@ -126,7 +126,21 @@ btnEnviarTicket.addEventListener('click', async function() {
         const data = await response.json();
         alert('Ticket enviado com sucesso!');
         closeTicketModal();
-        
+
+        // Recarregar timeline do chamado no modal, se estiver aberto
+        try {
+            const ch = chamadosData.find(c => c.id == chamadoId);
+            if (ch) {
+                openModal(ch);
+                // Trocar para a aba Histórico
+                const historicoTabBtn = document.querySelector('#tab-historico');
+                if (historicoTabBtn) {
+                    const tab = new bootstrap.Tab(historicoTabBtn);
+                    tab.show();
+                }
+            }
+        } catch (e) { /* ignore */ }
+
     } catch (error) {
         console.error('Erro ao enviar ticket:', error);
         alert(`Erro ao enviar ticket: ${error.message}`);
