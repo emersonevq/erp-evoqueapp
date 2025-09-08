@@ -2664,6 +2664,12 @@ document.getElementById('btnEnviarTicket')?.addEventListener('click', async () =
         if (window.advancedNotificationSystem) {
             window.advancedNotificationSystem.showSuccess('Ticket Enviado', 'Ticket enviado com sucesso!');
         }
+        // Recarregar lista e atualizar modal aberto
+        await loadChamados();
+        const ch = chamadosData.find(c => c.id == chamadoId);
+        if (ch) {
+            openModal(ch); // reabrir modal com timeline atualizada
+        }
     } catch (error) {
         console.error('Erro ao enviar ticket:', error);
         if (window.advancedNotificationSystem) {
@@ -2903,7 +2909,7 @@ document.getElementById('formCriarAgente')?.addEventListener('submit', async fun
     await criarAgente();
 });
 
-// Carregar usuários para sele��ão no modal de agente
+// Carregar usuários para seleção no modal de agente
 async function carregarUsuariosParaAgente() {
     try {
         const response = await fetch('/ti/painel/api/usuarios-disponiveis');
