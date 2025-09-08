@@ -62,7 +62,14 @@ def obter_timeline_chamado(id):
                 'usuario_nome': autor_nome,
                 'autor_tipo': autor_tipo,
                 'criado_em': ev.criado_em.strftime('%d/%m/%Y %H:%M:%S') if ev.criado_em else None,
+                'metadados': None
             }
+            if ev.metadados:
+                try:
+                    import json as _json
+                    item['metadados'] = _json.loads(ev.metadados)
+                except Exception:
+                    item['metadados'] = None
             if anexo_info:
                 item['anexo'] = anexo_info
             resultado.append(item)
