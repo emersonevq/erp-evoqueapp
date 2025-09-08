@@ -1045,11 +1045,20 @@ async function openModal(chamado) {
                     else if (ev.tipo === 'attachment_sent') icon = 'fa-paperclip';
                     else if (ev.tipo === 'ticket_sent') icon = 'fa-envelope';
 
-                    const who = ev.usuario_nome ? ` [${ev.usuario_nome}]` : '';
-                    const when = ev.criado_em ? ` - ${ev.criado_em}` : '';
+                    const whoBadge = ev.autor_tipo ? `<span class="badge ${ev.autor_tipo==='Suporte' ? 'bg-info' : 'bg-secondary'}">${ev.autor_tipo}</span>` : '';
+                    const whoName = ev.usuario_nome ? ` <small>(${ev.usuario_nome})</small>` : '';
+                    const when = ev.criado_em ? ` <small class="text-muted">${ev.criado_em}</small>` : '';
                     const anexoHtml = ev.anexo ? ` <a href="${ev.anexo.url}" target="_blank" rel="noopener">${fileNameFrom(ev.anexo.url, ev.anexo.nome)}</a>` : '';
 
-                    items.push(`<li><i class="fas ${icon} history-icon"></i><span>${label}${who}${anexoHtml}${when}</span></li>`);
+                    let extra = '';
+                    if (ev.tipo === 'ticket_sent' && ev.metadados) {
+                        const md = ev.metadados;
+                        const assunto = md.assunto ? `<div><strong>${md.assunto}</strong></div>` : '';
+                        const msg = md.mensagem ? `<div class="text-wrap">${(md.mensagem || '').replace(/\n/g,'<br>')}</div>` : '';
+                        extra = `${assunto}${msg}`;
+                    }
+
+                    items.push(`<li><i class="fas ${icon} history-icon"></i><span>${whoBadge}${whoName} ${label}${anexoHtml}${when}${extra ? '<div class="mt-1">'+extra+'</div>' : ''}</span></li>`);
                 });
             }
         } catch (e) {
