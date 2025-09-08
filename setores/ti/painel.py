@@ -1120,6 +1120,21 @@ def atualizar_chamado_agente(chamado_id):
                 status_anterior = chamado.status
                 chamado.status = novo_status
 
+                # Registrar evento de alteração de status
+                try:
+                    from database import ChamadoTimelineEvent
+                    evento_status = ChamadoTimelineEvent(
+                        chamado_id=chamado.id,
+                        usuario_id=current_user.id,
+                        tipo='status_change',
+                        descricao=f'Status alterado de {status_anterior} para {novo_status}',
+                        status_anterior=status_anterior,
+                        status_novo=novo_status
+                    )
+                    db.session.add(evento_status)
+                except Exception as e:
+                    logger.warning(f"Falha ao registrar timeline de status: {str(e)}")
+
                 # Atualizar campos de SLA baseado na mudança de status
                 agora_brazil = get_brazil_time()
 
@@ -3848,7 +3863,7 @@ def sincronizar_sla_database():
             tipo_recurso='sla'
         )
 
-        logger.info(f"Sincronização SLA concluída: {configuracoes_corrigidas} configs, {chamados_corrigidos} chamados, {feriados_adicionados} feriados")
+        logger.info(f"Sincronizaç��o SLA concluída: {configuracoes_corrigidas} configs, {chamados_corrigidos} chamados, {feriados_adicionados} feriados")
 
         return json_response({
             'success': True,
