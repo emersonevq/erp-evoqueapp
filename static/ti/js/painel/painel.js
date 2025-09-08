@@ -1004,63 +1004,70 @@ async function openModal(chamado) {
     modalData.textContent = chamado.data_abertura.split(' ')[0];
     modalStatusSelect.value = chamado.status;
 
-    // Historico em aba dedicada (linha do tempo unificada)
+    // Histórico na aba: usar eventos do backend, ordenar e evitar duplicação
     const timelineList = document.getElementById('timelineList');
     if (timelineList) {
-        const itens = [];
+        const items = [];
 
-        // Evento inicial: chamado aberto
-        if (chamado.data_abertura) {
-            itens.push(`<li><i class=\"fas fa-plus-circle history-icon\"></i><span>Chamado aberto - ${chamado.data_abertura}</span></li>`);
-        }
-
-        // Anexos do solicitante como eventos
-        if (Array.isArray(chamado.anexos) && chamado.anexos.length > 0) {
-            chamado.anexos.forEach(ax => {
-                const size = ax.tamanho_kb ? ` (${ax.tamanho_kb} KB)` : '';
-                itens.push(`<li><i class=\"fas fa-paperclip history-icon\"></i><span>Anexo do solicitante: <a href=\"${ax.url}\" target=\"_blank\" rel=\"noopener\">${ax.nome}${size}</a></span></li>`);
-            });
+        function fileNameFrom(url, nome) {
+            if (nome) return nome;
+            try { const u = new URL(url, window.location.origin); return decodeURIComponent(u.pathname.split('/').pop()); } catch (_) { return url || ''; }
         }
 
-        // Status básicos (assumido, concluído, cancelado)
-        const h = chamado.historico || {};
-        if (h.assumido_por_nome && h.assumido_em) {
-            itens.push(`<li><i class=\"fas fa-user-check history-icon\"></i><span>Assumido por ${h.assumido_por_nome} em ${h.assumido_em}</span></li>`);
-        }
-        if (h.concluido_por_nome && h.concluido_em) {
-            itens.push(`<li><i class=\"fas fa-check-circle history-icon\"></i><span>Concluído por ${h.concluido_por_nome} em ${h.concluido_em}</span></li>`);
-        }
-        if (h.cancelado_por_nome && h.cancelado_em) {
-            itens.push(`<li><i class=\"fas fa-times-circle history-icon\"></i><span>Cancelado por ${h.cancelado_por_nome} em ${h.cancelado_em}</span></li>`);
-        }
-
-        // Timeline completa do backend (mensagens de ticket, anexos do suporte, mudanças de status)
         try {
             const tlResp = await fetch(`/ti/api/chamados/${chamado.id}/timeline`, { headers: { 'Accept': 'application/json' } });
             if (tlResp.ok) {
-                const eventos = await tlResp.json();
+                let eventos = await tlResp.json();
+
+                // Ordenar por data (mais antigo -> mais recente)
+                const parseD = s => Date.parse((s || '').replace(' ', 'T')) || 0;
+                eventos.sort((a, b) => parseD(a.criado_em) - parseD(b.criado_em));
+
+                // Remover duplicados por tipo+timestamp+anexo
+                const seen = new Set();
                 eventos.forEach(ev => {
+                    const key = `${ev.tipo}-${ev.criado_em}-${ev.anexo?.nome || ''}`;
+                    if (seen.has(key)) return;
+                    seen.add(key);
+
                     let icon = 'fa-stream';
+                    let label = ev.descricao || '';
+                    if (!label) {
+                        if (ev.tipo === 'created') label = 'Chamado criado';
+                        else if (ev.tipo === 'status_change') label = 'Status alterado';
+                        else if (ev.tipo === 'attachment_received') label = 'Anexo do solicitante';
+                        else if (ev.tipo === 'attachment_sent') label = 'Anexo do suporte';
+                        else if (ev.tipo === 'ticket_sent') label = 'Ticket enviado';
+                    }
                     if (ev.tipo === 'created') icon = 'fa-plus-circle';
                     else if (ev.tipo === 'status_change') icon = 'fa-exchange-alt';
-                    else if (ev.tipo === 'attachment_received') icon = 'fa-file-download';
-                    else if (ev.tipo === 'attachment_sent') icon = 'fa-file-upload';
+                    else if (ev.tipo === 'attachment_received') icon = 'fa-paperclip';
+                    else if (ev.tipo === 'attachment_sent') icon = 'fa-paperclip';
                     else if (ev.tipo === 'ticket_sent') icon = 'fa-envelope';
 
-                    const anexoHtml = ev.anexo ? ` <a href=\"${ev.anexo.url}\" target=\"_blank\" rel=\"noopener\">${ev.anexo.nome}</a>` : '';
-                    const senderParts = [];
-                    if (ev.autor_tipo) senderParts.push(ev.autor_tipo);
-                    if (ev.usuario_nome) senderParts.push(`(${ev.usuario_nome})`);
-                    const senderPrefix = senderParts.length ? `[${senderParts.join(' ')}] ` : '';
+                    const who = ev.usuario_nome ? ` [${ev.usuario_nome}]` : '';
+                    const when = ev.criado_em ? ` - ${ev.criado_em}` : '';
+                    const anexoHtml = ev.anexo ? ` <a href="${ev.anexo.url}" target="_blank" rel="noopener">${fileNameFrom(ev.anexo.url, ev.anexo.nome)}</a>` : '';
 
-                    itens.push(`<li><i class=\"fas ${icon} history-icon\"></i><span>${senderPrefix}${ev.descricao || ev.tipo}${anexoHtml} - ${ev.criado_em || ''}</span></li>`);
+                    items.push(`<li><i class="fas ${icon} history-icon"></i><span>${label}${who}${anexoHtml}${when}</span></li>`);
                 });
             }
         } catch (e) {
             console.warn('Falha ao carregar timeline:', e);
         }
 
-        timelineList.innerHTML = itens.join('');
+        // Fallback simples caso a API não retorne eventos
+        if (items.length === 0) {
+            if (chamado.data_abertura) items.push(`<li><i class="fas fa-plus-circle history-icon"></i><span>Chamado aberto - ${chamado.data_abertura}</span></li>`);
+            if (Array.isArray(chamado.anexos)) {
+                chamado.anexos.forEach(ax => {
+                    const size = ax.tamanho_kb ? ` (${ax.tamanho_kb} KB)` : '';
+                    items.push(`<li><i class="fas fa-paperclip history-icon"></i><span>Anexo do solicitante: <a href="${ax.url}" target="_blank" rel="noopener">${ax.nome || fileNameFrom(ax.url)}</a>${size}</span></li>`);
+                });
+            }
+        }
+
+        timelineList.innerHTML = items.join('');
     }
 
     // Tabs: utilizar Bootstrap (data-bs-toggle). Nenhuma ação extra necessária aqui.
@@ -2460,7 +2467,7 @@ function initializePainel() {
     const sections = document.querySelectorAll('section.content-section');
 
     if (!sidebar || sections.length === 0) {
-        console.log('Elementos DOM ainda não disponíveis, tentando novamente em 100ms...');
+        console.log('Elementos DOM ainda n��o disponíveis, tentando novamente em 100ms...');
         setTimeout(initializePainel, 100);
         return;
     }
