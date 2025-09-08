@@ -2157,16 +2157,6 @@
     </div>
   </div>
 
-  <style>
-    .modal-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
-    .modal-tabs .tab-button { background: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
-    .modal-tabs .tab-button.active { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
-    .tab-pane { display: none; }
-    .tab-pane.active { display: block; }
-    .timeline-list { list-style: none; padding: 0; margin: 0; }
-    .timeline-list li { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
-    .timeline-list .history-icon { color: var(--primary-color); }
-  </style>
   <!-- Modal Detalhes do Chamado -->
   <div class="modal" id="modalChamado" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalDesc">
     <div class="modal-content">
@@ -2175,12 +2165,16 @@
         <button class="modal-close" aria-label="Fechar modal" id="modalClose">&times;</button>
       </div>
       <div class="modal-body" id="modalBody">
-        <div class="modal-tabs" id="modalTabs">
-          <button type="button" class="tab-button active" data-tab="detalhesTab">Detalhes</button>
-          <button type="button" class="tab-button" data-tab="historicoTab">Histórico</button>
-        </div>
+        <ul class="nav nav-tabs mb-3" id="modalChamadoTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-detalhes" data-bs-toggle="tab" data-bs-target="#detalhesTab" type="button" role="tab" aria-controls="detalhesTab" aria-selected="true">Detalhes</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-historico" data-bs-toggle="tab" data-bs-target="#historicoTab" type="button" role="tab" aria-controls="historicoTab" aria-selected="false">Histórico</button>
+          </li>
+        </ul>
         <div class="tab-content">
-          <div id="detalhesTab" class="tab-pane active">
+          <div id="detalhesTab" class="tab-pane fade show active" role="tabpanel" aria-labelledby="tab-detalhes">
             <p><strong>Código:</strong> <span id="modalCodigo"></span></p>
             <p><strong>Protocolo:</strong> <span id="modalProtocolo"></span></p>
             <p><strong>Solicitante:</strong> <span id="modalSolicitante"></span></p>
@@ -2199,8 +2193,8 @@
               <option value="Cancelado">Cancelado</option>
             </select>
           </div>
-          <div id="historicoTab" class="tab-pane">
-            <ul class="timeline-list" id="timelineList"></ul>
+          <div id="historicoTab" class="tab-pane fade" role="tabpanel" aria-labelledby="tab-historico">
+            <ul class="history-list" id="timelineList"></ul>
           </div>
         </div>
       </div>
@@ -3447,7 +3441,7 @@ async function salvarConfiguracoesChamados() {
         
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.error || 'Erro ao salvar configurações');
+            throw new Error(error.error || 'Erro ao salvar configura��ões');
         }
         
         const data = await response.json();
