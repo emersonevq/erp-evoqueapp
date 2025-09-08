@@ -1049,8 +1049,16 @@ async function openModal(chamado) {
                     else if (ev.tipo === 'attachment_received') icon = 'fa-file-download';
                     else if (ev.tipo === 'attachment_sent') icon = 'fa-file-upload';
                     else if (ev.tipo === 'ticket_sent') icon = 'fa-envelope';
+
                     const anexoHtml = ev.anexo ? ` <a href=\"${ev.anexo.url}\" target=\"_blank\" rel=\"noopener\">${ev.anexo.nome}</a>` : '';
-                    itens.push(`<li><i class=\"fas ${icon} history-icon\"></i><span>${ev.descricao || ev.tipo}${anexoHtml} - ${ev.criado_em || ''}</span></li>`);
+
+                    // Montar remetente (quem realizou a ação)
+                    const senderParts = [];
+                    if (ev.autor_tipo) senderParts.push(ev.autor_tipo);
+                    if (ev.usuario_nome) senderParts.push(`(${ev.usuario_nome})`);
+                    const senderPrefix = senderParts.length ? `[${senderParts.join(' ')}] ` : '';
+
+                    itens.push(`<li><i class=\"fas ${icon} history-icon\"></i><span>${senderPrefix}${ev.descricao || ev.tipo}${anexoHtml} - ${ev.criado_em || ''}</span></li>`);
                 });
             }
         } catch (e) {
@@ -5214,7 +5222,7 @@ function debugSistemaPainel() {
         if (typeof window.loadChamados !== 'function') problemas.push('Função loadChamados não disponível');
 
         if (problemas.length === 0) {
-            console.log('✅ SISTEMA FUNCIONANDO CORRETAMENTE');
+            console.log('�� SISTEMA FUNCIONANDO CORRETAMENTE');
         } else {
             console.error('❌ PROBLEMAS ENCONTRADOS:');
             problemas.forEach(problema => console.error('- ' + problema));
