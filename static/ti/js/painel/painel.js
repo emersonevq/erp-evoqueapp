@@ -1063,23 +1063,7 @@ async function openModal(chamado) {
         timelineList.innerHTML = itens.join('');
     }
 
-    // Controle das abas do modal
-    const tabs = document.querySelectorAll('#modalChamado .tab-button');
-    const panes = document.querySelectorAll('#modalChamado .tab-pane');
-    tabs.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            tabs.forEach(b => b.classList.remove('active'));
-            panes.forEach(p => p.classList.remove('active'));
-            btn.classList.add('active');
-            const target = document.getElementById(btn.dataset.tab);
-            if (target) target.classList.add('active');
-        });
-    });
-
-    // Garantir que a aba de detalhes inicie ativa
-    document.querySelector('#modalChamado .tab-button[data-tab="detalhesTab"]')?.classList.add('active');
-    document.getElementById('detalhesTab')?.classList.add('active');
+    // Tabs: utilizar Bootstrap (data-bs-toggle). Nenhuma ação extra necessária aqui.
 
     modal.classList.add('active');
 }
@@ -1218,7 +1202,7 @@ document.getElementById('btnGerarSenha')?.addEventListener('click', function(e) 
     gerarSenha();
 });
 
-// Funç���o para validar dados do usuário
+// Funç��o para validar dados do usuário
 function validarDadosUsuario(dados) {
     const erros = [];
     
@@ -1310,7 +1294,7 @@ document.getElementById('formCriarUsuario')?.addEventListener('submit', async fu
 
                 if (agenteResponse.ok) {
                     if (window.advancedNotificationSystem) {
-                        window.advancedNotificationSystem.showSuccess('Usuário e Agente Criados', `Usu��rio ${data.nome} criado e registrado como agente de suporte!`);
+                        window.advancedNotificationSystem.showSuccess('Usuário e Agente Criados', `Usuário ${data.nome} criado e registrado como agente de suporte!`);
                     }
                 } else {
                     if (window.advancedNotificationSystem) {
@@ -3702,7 +3686,7 @@ function renderizarUsuarios(usuarios) {
         // Verificações de propriedades essenciais
         if (!usuario || typeof usuario !== 'object') {
             console.warn('Objeto de usuário inválido:', usuario);
-            return '<div class="card"><div class="card-body text-danger">Dados de usuário inválidos</div></div>';
+            return '<div class="card"><div class="card-body text-danger">Dados de usuário inv��lidos</div></div>';
         }
 
         const nome = usuario.nome || 'Nome não informado';
@@ -5198,7 +5182,7 @@ function debugSistemaPainel() {
                 console.error('✗ Função activateSection não disponível');
             }
         } catch (error) {
-            console.error('✗ Erro ao testar navegação:', error);
+            console.error('�� Erro ao testar navegação:', error);
         }
 
         // 6. Verificar contadores da visão geral
