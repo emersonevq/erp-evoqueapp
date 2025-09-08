@@ -443,7 +443,7 @@ def setup_demo_page():
     '''
 
 def carregar_configuracoes():
-    """Carrega configurações do banco de dados ou retorna padr����es"""
+    """Carrega configurações do banco de dados ou retorna padr�����es"""
     try:
         config_final = CONFIGURACOES_PADRAO.copy()
 
@@ -1355,7 +1355,7 @@ def notificacoes_agente():
         notificacoes = [
             {
                 'id': 1,
-                'titulo': 'Novo chamado atribu��do',
+                'titulo': 'Novo chamado atribuído',
                 'mensagem': 'Você tem um novo chamado de alta prioridade',
                 'tipo': 'chamado_atribuido',
                 'prioridade': 'alta',
@@ -2192,20 +2192,8 @@ def listar_chamados():
                 # Converter data de visita se existir
                 data_visita_str = c.data_visita.strftime('%d/%m/%Y') if c.data_visita else None
 
-                # Buscar agente atribuído
-                agente_info = None
-                chamado_agente = ChamadoAgente.query.filter_by(
-                    chamado_id=c.id,
-                    ativo=True
-                ).first()
-
-                if chamado_agente and chamado_agente.agente:
-                    agente_info = {
-                        'id': chamado_agente.agente.id,
-                        'nome': f"{chamado_agente.agente.usuario.nome} {chamado_agente.agente.usuario.sobrenome}",
-                        'usuario': chamado_agente.agente.usuario.usuario,
-                        'nivel_experiencia': chamado_agente.agente.nivel_experiencia
-                    }
+                # Buscar agente atribuído (via mapa pré-carregado)
+                agente_info = agentes_map.get(c.id)
 
                 anexos_payload = []
                 try:
@@ -3060,7 +3048,7 @@ def atualizar_usuario(user_id):
             # Verificar se email não está em uso por outro usuário
             existing_user = User.query.filter(User.email == data['email'], User.id != user_id).first()
             if existing_user:
-                return error_response('Email já est�� em uso por outro usuário', 400)
+                return error_response('Email já está em uso por outro usuário', 400)
             usuario.email = data['email']
         if 'nivel_acesso' in data:
             niveis_validos = ['Administrador', 'Gerente', 'Gerente Regional', 'Gestor', 'Agente de suporte']
