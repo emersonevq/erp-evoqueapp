@@ -4,6 +4,7 @@ from datetime import datetime, date
 import json
 import os
 import pytz
+import unicodedata
 from sqlalchemy import Numeric
 
 db = SQLAlchemy()
@@ -88,8 +89,12 @@ class User(db.Model, UserMixin):
         if not setor_identificador:
             return False
 
-        # Normalizar entrada (aceita tanto a parte da URL quanto o nome exibido, com qualquer capitalização)
-        chave = str(setor_identificador).strip().lower()
+        def _normalize_text(s):
+            s = str(s or '').strip()
+            s_nfkd = unicodedata.normalize('NFKD', s)
+            return ''.join(c for c in s_nfkd if not unicodedata.combining(c)).lower()
+
+        chave = _normalize_text(setor_identificador)
         mapeamento_setores = {
             'ti': 'TI',
             'compras': 'Compras',
@@ -104,10 +109,11 @@ class User(db.Model, UserMixin):
 
         # Se veio a chave da URL, mapear para o nome do setor; caso contrário, usar como foi passado
         setor_alvo = mapeamento_setores.get(chave, str(setor_identificador).strip())
+        setor_alvo_norm = _normalize_text(setor_alvo)
 
-        # Comparar ignorando capitalização
+        # Comparar ignorando capitalização e acentos
         setores_usuario = [str(s) for s in (self.setores or [])]
-        return any(s.lower() == setor_alvo.lower() for s in setores_usuario)
+        return any(_normalize_text(s) == setor_alvo_norm for s in setores_usuario)
 
     def tem_permissao(self, permissao_necessaria):
         niveis_acesso = {
