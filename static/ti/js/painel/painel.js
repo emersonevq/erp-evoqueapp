@@ -990,7 +990,7 @@ const modalStatusSelect = document.getElementById('modalStatus');
 let currentModalChamadoId = null;
 
 // Funções do Modal de Chamados
-function openModal(chamado) {
+async function openModal(chamado) {
     currentModalChamadoId = chamado.id;
     modalCodigo.textContent = chamado.codigo;
     modalProtocolo.textContent = chamado.protocolo;
@@ -1021,13 +1021,13 @@ function openModal(chamado) {
         }
     }
 
-    // Histórico
+    // Histórico (status básicos) + Timeline do servidor
     const historicoSection = document.getElementById('modalHistoricoSection');
     const listaHistorico = document.getElementById('listaHistorico');
     if (listaHistorico && historicoSection) {
         listaHistorico.innerHTML = '';
-        const h = chamado.historico || {};
         const itens = [];
+        const h = chamado.historico || {};
         if (h.assumido_por_nome && h.assumido_em) {
             itens.push(`<li><i class=\"fas fa-user-check history-icon\"></i><span>Assumido por ${h.assumido_por_nome} em ${h.assumido_em}</span></li>`);
         }
@@ -1037,6 +1037,26 @@ function openModal(chamado) {
         if (h.cancelado_por_nome && h.cancelado_em) {
             itens.push(`<li><i class=\"fas fa-times-circle history-icon\"></i><span>Cancelado por ${h.cancelado_por_nome} em ${h.cancelado_em}</span></li>`);
         }
+        // Buscar timeline completa do backend
+        try {
+            const tlResp = await fetch(`/ti/api/chamados/${chamado.id}/timeline`, { headers: { 'Accept': 'application/json' } });
+            if (tlResp.ok) {
+                const eventos = await tlResp.json();
+                eventos.forEach(ev => {
+                    let icon = 'fa-stream';
+                    if (ev.tipo === 'created') icon = 'fa-plus-circle';
+                    else if (ev.tipo === 'status_change') icon = 'fa-exchange-alt';
+                    else if (ev.tipo === 'attachment_received') icon = 'fa-file-download';
+                    else if (ev.tipo === 'attachment_sent') icon = 'fa-file-upload';
+                    else if (ev.tipo === 'ticket_sent') icon = 'fa-envelope';
+                    const anexoHtml = ev.anexo ? ` <a href=\"${ev.anexo.url}\" target=\"_blank\" rel=\"noopener\">${ev.anexo.nome}</a>` : '';
+                    itens.push(`<li><i class=\"fas ${icon} history-icon\"></i><span>${ev.descricao || ev.tipo}${anexoHtml} - ${ev.criado_em || ''}</span></li>`);
+                });
+            }
+        } catch (e) {
+            console.warn('Falha ao carregar timeline:', e);
+        }
+
         if (itens.length > 0) {
             historicoSection.style.display = 'block';
             listaHistorico.innerHTML = itens.join('');
@@ -2883,7 +2903,7 @@ document.getElementById('formCriarAgente')?.addEventListener('submit', async fun
     await criarAgente();
 });
 
-// Carregar usuários para seleção no modal de agente
+// Carregar usuários para sele��ão no modal de agente
 async function carregarUsuariosParaAgente() {
     try {
         const response = await fetch('/ti/painel/api/usuarios-disponiveis');
