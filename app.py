@@ -115,6 +115,7 @@ def favicon():
 app.register_blueprint(main_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(ti_bp, url_prefix='/ti')
+app.register_blueprint(timeline_bp, url_prefix='/ti')
 app.register_blueprint(compras_bp, url_prefix='/compras')
 app.register_blueprint(financeiro_bp, url_prefix='/financeiro')
 app.register_blueprint(manutencao)
@@ -439,7 +440,7 @@ Agora você pode usar com segurança a funcionalidade "Esqueci minha senha"!
             <p><strong>Destinatário:</strong> {destinatario}</p>
             <p><strong>Assunto:</strong> {assunto}</p>
             <div style="background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                <h3>��� Configuração funcionando perfeitamente!</h3>
+                <h3>🎉 Configuração funcionando perfeitamente!</h3>
                 <p>O sistema de email Microsoft Graph está operacional. Verifique sua caixa de entrada.</p>
             </div>
             <h3>✅ Funcionalidades habilitadas:</h3>
