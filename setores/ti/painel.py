@@ -1355,7 +1355,7 @@ def notificacoes_agente():
         notificacoes = [
             {
                 'id': 1,
-                'titulo': 'Novo chamado atribuído',
+                'titulo': 'Novo chamado atribu��do',
                 'mensagem': 'Você tem um novo chamado de alta prioridade',
                 'tipo': 'chamado_atribuido',
                 'prioridade': 'alta',
@@ -2150,19 +2150,37 @@ def remover_unidade(id):
 @setor_required('ti')
 def listar_chamados():
     try:
-        logger.debug("Iniciando consulta de chamados...")
+        logger.debug("Iniciando consulta de chamados (otimizada)...")
         from database import ChamadoAgente, AgenteSuporte, User
+        from sqlalchemy.orm import selectinload
 
-        # Fazer join com agentes se existir
-        chamados = db.session.query(Chamado).outerjoin(
-            ChamadoAgente, (Chamado.id == ChamadoAgente.chamado_id) & (ChamadoAgente.ativo == True)
-        ).outerjoin(
-            AgenteSuporte, ChamadoAgente.agente_id == AgenteSuporte.id
-        ).outerjoin(
-            User, AgenteSuporte.usuario_id == User.id
-        ).order_by(Chamado.data_abertura.desc()).all()
+        # Carregar chamados com anexos via selectinload (evita N+1)
+        chamados = (
+            Chamado.query.options(selectinload(Chamado.anexos))
+            .order_by(Chamado.data_abertura.desc())
+            .all()
+        )
 
         logger.debug(f"Total de chamados encontrados: {len(chamados)}")
+
+        # Pré-buscar agente atribuído para todos os chamados em UMA query
+        ids = [c.id for c in chamados]
+        agentes_map = {}
+        if ids:
+            atribs = (
+                db.session.query(ChamadoAgente, AgenteSuporte, User)
+                .join(AgenteSuporte, ChamadoAgente.agente_id == AgenteSuporte.id)
+                .join(User, AgenteSuporte.usuario_id == User.id)
+                .filter(ChamadoAgente.ativo == True, ChamadoAgente.chamado_id.in_(ids))
+                .all()
+            )
+            for ca, ag, usr in atribs:
+                agentes_map[ca.chamado_id] = {
+                    'id': ag.id,
+                    'nome': f"{usr.nome} {usr.sobrenome}",
+                    'usuario': usr.usuario,
+                    'nivel_experiencia': ag.nivel_experiencia
+                }
 
         chamados_list = []
         for c in chamados:
@@ -3042,7 +3060,7 @@ def atualizar_usuario(user_id):
             # Verificar se email não está em uso por outro usuário
             existing_user = User.query.filter(User.email == data['email'], User.id != user_id).first()
             if existing_user:
-                return error_response('Email já está em uso por outro usuário', 400)
+                return error_response('Email já est�� em uso por outro usuário', 400)
             usuario.email = data['email']
         if 'nivel_acesso' in data:
             niveis_validos = ['Administrador', 'Gerente', 'Gerente Regional', 'Gestor', 'Agente de suporte']
