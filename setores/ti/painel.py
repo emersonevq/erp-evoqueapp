@@ -3307,13 +3307,28 @@ Equipe de Suporte TI - Evoque Fitness
             db.session.add(historico)
             db.session.commit()
 
-            # Salvar anexos do ticket, se houver
+            # Registrar evento de timeline: ticket enviado
+            try:
+                from database import ChamadoTimelineEvent
+                evento_ticket = ChamadoTimelineEvent(
+                    chamado_id=chamado.id,
+                    usuario_id=getattr(current_user, 'id', None),
+                    tipo='ticket_sent',
+                    descricao=f"Ticket enviado: {assunto} para {', '.join(destinatarios)}"
+                )
+                db.session.add(evento_ticket)
+                db.session.commit()
+            except Exception as e:
+                logger.warning(f"Falha ao registrar timeline de ticket: {str(e)}")
+
+            # Salvar anexos do ticket, se houver, e criar eventos na timeline
             try:
                 if arquivos:
                     from werkzeug.utils import secure_filename
                     from security.security_config import SecurityConfig
                     base_dir = os.path.join('static', 'uploads', 'tickets', chamado.codigo, str(historico.id))
                     os.makedirs(base_dir, exist_ok=True)
+                    from database import AnexoArquivo, ChamadoTimelineEvent
                     for arquivo in arquivos:
                         if not arquivo or arquivo.filename == '':
                             continue
@@ -3325,7 +3340,6 @@ Equipe de Suporte TI - Evoque Fitness
                         arquivo.save(caminho)
                         tamanho = os.path.getsize(caminho) if os.path.exists(caminho) else None
 
-                        from database import AnexoArquivo
                         anexo = AnexoArquivo(
                             historico_ticket_id=historico.id,
                             chamado_id=chamado.id,
@@ -3336,11 +3350,22 @@ Equipe de Suporte TI - Evoque Fitness
                             usuario_id=current_user.id
                         )
                         db.session.add(anexo)
+                        db.session.flush()  # obter ID do anexo
+
+                        # Timeline: anexo enviado pelo suporte
+                        evento_anexo = ChamadoTimelineEvent(
+                            chamado_id=chamado.id,
+                            usuario_id=getattr(current_user, 'id', None),
+                            tipo='attachment_sent',
+                            descricao=f'Anexo enviado: {arquivo.filename}',
+                            anexo_id=anexo.id
+                        )
+                        db.session.add(evento_anexo)
                     db.session.commit()
             except Exception as e:
                 logger.error(f"Erro ao salvar anexos do ticket: {str(e)}")
                 db.session.rollback()
-            
+
             # Emitir evento Socket.IO apenas se a conexão estiver disponível
             try:
                 if hasattr(current_app, 'socketio'):
@@ -3353,7 +3378,7 @@ Equipe de Suporte TI - Evoque Fitness
                     })
             except Exception as socket_error:
                 logger.warning(f"Erro ao emitir evento Socket.IO: {str(socket_error)}")
-            
+
             return json_response({
                 'message': 'Ticket enviado com sucesso',
                 'chamado_id': chamado.id,
@@ -4887,7 +4912,7 @@ def carregar_configuracoes_avancadas():
 @login_required
 @setor_required('Administrador')
 def salvar_configuracoes_avancadas():
-    """Salva configurações avançadas do sistema"""
+    """Salva configura��ões avançadas do sistema"""
     try:
         if not request.is_json:
             return error_response('Content-Type deve ser application/json', 400)
