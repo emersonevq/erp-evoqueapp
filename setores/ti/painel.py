@@ -3310,11 +3310,17 @@ Equipe de Suporte TI - Evoque Fitness
             # Registrar evento de timeline: ticket enviado
             try:
                 from database import ChamadoTimelineEvent
+                import json as _json
                 evento_ticket = ChamadoTimelineEvent(
                     chamado_id=chamado.id,
                     usuario_id=getattr(current_user, 'id', None),
                     tipo='ticket_sent',
-                    descricao=f"Ticket enviado: {assunto} para {', '.join(destinatarios)}"
+                    descricao=f"Ticket enviado: {assunto} para {', '.join(destinatarios)}",
+                    metadados=_json.dumps({
+                        'assunto': assunto,
+                        'mensagem': mensagem,
+                        'destinatarios': destinatarios
+                    })
                 )
                 db.session.add(evento_ticket)
                 db.session.commit()
@@ -4290,7 +4296,7 @@ def criar_agente():
         data = request.get_json()
 
         if not data:
-            return error_response('Dados não fornecidos')
+            return error_response('Dados n��o fornecidos')
 
         usuario_id = data.get('usuario_id')
         if not usuario_id:
@@ -4912,7 +4918,7 @@ def carregar_configuracoes_avancadas():
 @login_required
 @setor_required('Administrador')
 def salvar_configuracoes_avancadas():
-    """Salva configura��ões avançadas do sistema"""
+    """Salva configurações avançadas do sistema"""
     try:
         if not request.is_json:
             return error_response('Content-Type deve ser application/json', 400)
