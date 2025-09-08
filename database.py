@@ -82,10 +82,14 @@ class User(db.Model, UserMixin):
             self._setores = json.dumps([value])
             self.setor = value
 
-    def tem_acesso_setor(self, setor_url):
+    def tem_acesso_setor(self, setor_identificador):
         if self.nivel_acesso == 'Administrador':
             return True
-            
+        if not setor_identificador:
+            return False
+
+        # Normalizar entrada (aceita tanto a parte da URL quanto o nome exibido, com qualquer capitalização)
+        chave = str(setor_identificador).strip().lower()
         mapeamento_setores = {
             'ti': 'TI',
             'compras': 'Compras',
@@ -94,15 +98,16 @@ class User(db.Model, UserMixin):
             'marketing': 'Marketing',
             'produtos': 'Produtos',
             'comercial': 'Comercial',
+            'outros': 'Outros',
             'servicos': 'Outros'
         }
-        
-        setor_valor = mapeamento_setores.get(setor_url)
-        if not setor_valor:
-            return False
-            
-        setores_usuario = self.setores
-        return setor_valor in setores_usuario
+
+        # Se veio a chave da URL, mapear para o nome do setor; caso contrário, usar como foi passado
+        setor_alvo = mapeamento_setores.get(chave, str(setor_identificador).strip())
+
+        # Comparar ignorando capitalização
+        setores_usuario = [str(s) for s in (self.setores or [])]
+        return any(s.lower() == setor_alvo.lower() for s in setores_usuario)
 
     def tem_permissao(self, permissao_necessaria):
         niveis_acesso = {
